@@ -86,8 +86,8 @@ html[data-theme=dark] .sector-label{fill:#f3eef6}
 /* --------------------------- кнопки --------------------------- */
 .spin-row{display:flex; flex-direction:column; align-items:center; gap:8px; width:100%}
 .mini-row{display:flex; gap:8px; flex-wrap:wrap; justify-content:center}
-.speed-row{display:flex; gap:6px; padding:4px 6px; border:1.5px solid var(--line); border-radius:999px; background:var(--card-2)}
-.speed-row .btn.small{border:1px solid transparent; background:transparent; box-shadow:none; min-height:38px}
+.speed-row{display:flex; gap:6px; padding:5px 7px; border:1.5px solid var(--line); border-radius:999px; background:var(--card-2)}
+.speed-row .btn.small{border:1px solid transparent; background:transparent; box-shadow:none; min-height:44px; padding:.45rem .9rem}
 .speed-row .btn.small.sel{background:var(--grad); border-color:transparent; color:#fff; font-weight:700}
 .btn{
   border:1.5px solid var(--line); background:var(--card); color:var(--ink);
