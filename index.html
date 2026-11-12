@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>Колесо слов — крути, найди слово и расскажи, что оно значит</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%A1%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 
@@ -33,6 +33,11 @@
     <div class="spin-row">
       <button class="btn primary big" id="spin">🎡 Крутить колесо</button>
       <div class="mini-row">
+        <span class="speed-row" role="group" aria-label="Скорость вращения">
+          <button class="btn ghost small" id="sp-fast">🐇 Быстро</button>
+          <button class="btn ghost small" id="sp-normal">🎡 Обычно</button>
+          <button class="btn ghost small" id="sp-long">🐢 Дольше</button>
+        </span>
         <button class="btn ghost small" id="shuffle">🔀 Перемешать слова</button>
         <button class="btn ghost small" id="words-btn">✏️ Свои слова</button>
         <button class="btn ghost small" id="btn-sound">🔊 Звук вкл.</button>
@@ -86,6 +91,6 @@
   </div>
 </div>
 
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

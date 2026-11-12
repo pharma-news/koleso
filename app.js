@@ -28,9 +28,10 @@ function loadState(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY)||'null')||{};
     return { sound: s.sound!==false, theme: s.theme||'auto',
+             speed: s.speed||'long',
              words: Array.isArray(s.words)? s.words : [],
              found: Array.isArray(s.found)? s.found : [], spins: s.spins||0 };
-  }catch(e){ return { sound:true, theme:'auto', words:[], found:[], spins:0 }; }
+  }catch(e){ return { sound:true, theme:'auto', speed:'long', words:[], found:[], spins:0 }; }
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
 
@@ -157,6 +158,14 @@ function confStep(){
 /* ------------------------------ вращение ------------------------------ */
 function reducedMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
 
+/* режимы вращения: сколько оборотов и как долго колесо замедляется */
+const SPEED={
+  fast:   {turns:3, extra:1, dur:2600, tail:1200, wob:260, ease:3.0},
+  normal: {turns:5, extra:2, dur:4800, tail:1600, wob:420, ease:2.8},
+  long:   {turns:7, extra:3, dur:8000, tail:2600, wob:700, ease:2.2}
+};
+function spinMode(){ return SPEED[state.speed] || SPEED.long; }
+
 function pickWinner(){
   let i=rnd(SECTORS);
   if(i===lastWin) i=(i+1+rnd(SECTORS-1))%SECTORS;
@@ -171,9 +180,10 @@ function spin(){
   const target=((base%360)+360)%360;
   const cur=((rot%360)+360)%360;
   let delta=target-cur; if(delta<0) delta+=360;
-  const turns=4+rnd(3);
+  const m=spinMode();
+  const turns=m.turns+rnd(m.extra+1);
   const from=rot, to=rot+delta+turns*360;
-  const dur=reducedMotion()? 380 : 4200+rnd(900);
+  const dur=reducedMotion()? 380 : m.dur+rnd(m.tail);
 
   spinning=true;
   $('#spin').classList.add('busy');
@@ -184,7 +194,7 @@ function spin(){
 
   function frame(now){
     const p=Math.min(1,(now-t0)/dur);
-    const e=1-Math.pow(1-p,3);
+    const e=1-Math.pow(1-p,m.ease);
     rot=from+(to-from)*e;
     $('#rotor').setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
     const slot=Math.round(((rot%360)+360)%360/TAU);
@@ -195,10 +205,11 @@ function spin(){
 
   /* финальное «докачивание»: колесо чуть качается и останавливается */
   function settle(i){
-    const t0s=performance.now(), durS=reducedMotion()? 0 : 420;
+    const t0s=performance.now(), durS=reducedMotion()? 0 : m.wob;
+    const amp=m.wob>500?3.4:(m.wob>350?2.6:1.8);
     function s(now){
       const p=Math.min(1,(now-t0s)/durS);
-      const wob=Math.sin(p*Math.PI*3)*(1-p)*2.6;
+      const wob=Math.sin(p*Math.PI*(m.wob>500?4:3))*(1-p)*amp;
       $('#rotor').setAttribute('transform',`rotate(${(rot+wob).toFixed(2)} ${CX} ${CY})`);
       if(p<1) requestAnimationFrame(s); else land(i);
     }
@@ -305,6 +316,17 @@ $('#clear-found').addEventListener('click',()=>{
   if(!confirm('Удалить список найденных слов?')) return;
   state.found=[]; save(); renderFound(); updateCounts();
 });
+/* режим вращения: три скорости, выбор запоминается */
+const SPEED_BTN={ fast:'#sp-fast', normal:'#sp-normal', long:'#sp-long' };
+function renderSpeed(){
+  for(const k in SPEED_BTN){ const el=$(SPEED_BTN[k]); if(el) el.classList.toggle('sel', state.speed===k); }
+}
+for(const k in SPEED_BTN){
+  $(SPEED_BTN[k]).addEventListener('click',()=>{
+    state.speed=k; save(); renderSpeed();
+    tone(k==='long'?420:(k==='normal'?620:880), .12, 'triangle', .08, 0);
+  });
+}
 $('#btn-theme').addEventListener('click',toggleTheme);
 $('#btn-sound').addEventListener('click',()=>{
   state.sound=!state.sound; save();
@@ -326,4 +348,5 @@ window.addEventListener('resize',fitCanvas);
 /* ------------------------------ старт ------------------------------ */
 applyTheme();
 $('#btn-sound').textContent = state.sound? '🔊 Звук вкл.' : '🔇 Звук выкл.';
+renderSpeed();
 renderFound(); updateCounts(); fitCanvas();
