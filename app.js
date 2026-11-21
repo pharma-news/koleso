@@ -576,32 +576,48 @@ function spin(){
     v=0.16; prevT=performance.now(); prevSlot=slotOf(rot);
     phase(ms, (p, now)=>{ const dt=tick(now); chase(maxSpeed, dt); spinBy(dt); }, done);
   }
-  /* слёт: соскок с оси, звонкий удар об пол и качение вправо на той же скорости */
+  /* слёт: соскок с оси, падение, отскоки на месте — и только потом улетает вперёд */
   function flyOff(done){
     const right=offscreenShift(1), F=FLOOR_DROP;
+    const LEAVE=170, HIT1=520, HIT2=900, SETTLE=1240;   /* соскок, удар, отскок, начало качения */
     const t0=performance.now(); prevT=t0;
     let x=0, hits=0;
-    const touch=[150, 490, 870];                     /* соскок, удар об пол, отскок */
+    const creepEnd=8+26+12;                              /* сколько подтянется вперёд за отскоки */
     function fallY(t){
-      if(t<150) return -16*Math.sin((t/150)*Math.PI/2);
-      if(t<490){ const q=(t-150)/340; return -16+(F+16)*q*q; }
-      if(t<870){ const q=(t-490)/380; return F-13*Math.sin(q*Math.PI); }
-      if(t<1210){ const q=(t-870)/340; return F-5*Math.sin(q*Math.PI); }
+      if(t<LEAVE) return -18*Math.sin((t/LEAVE)*Math.PI/2);
+      if(t<HIT1){ const q=(t-LEAVE)/(HIT1-LEAVE); return -18+(F+18)*q*q; }
+      if(t<HIT2){ const q=(t-HIT1)/(HIT2-HIT1); return F-15*Math.sin(q*Math.PI); }
+      if(t<SETTLE){ const q=(t-HIT2)/(SETTLE-HIT2); return F-6*Math.sin(q*Math.PI); }
       return F+1.8*Math.sin(t/260);
+    }
+    function creep(t){
+      if(t<LEAVE) return 8*(t/LEAVE);
+      if(t<HIT2)  return 8+26*(t-LEAVE)/(HIT2-LEAVE);
+      if(t<SETTLE)return 34+12*(t-HIT2)/(SETTLE-HIT2);
+      return creepEnd;
     }
     onAxle=false;
     phase(9000, (p, now)=>{
       const dt=tick(now), t=now-t0;
       chase(ESCAPE_V, dt);
-      x += v*dt/ROLL_K;                              /* путь строго связан с углом: качение */
-      spinBy(dt);
-      setDisc(x, fallY(t));
-      if(hits<touch.length && t>=touch[hits]){
-        hits++;
-        if(!reducedMotion() && hits>1){ sparkBurst(hits===2?6:3, CX+x, FLOOR_Y-6, true); shakeMount(); }
+      spinBy(dt);                                    /* вращение не падает нигде */
+      let px;
+      if(t<SETTLE) px=creep(t);
+      else{
+        const q=Math.min(1,(t-SETTLE)/320);          /* пол цепляет колесо: разгон качения */
+        x += v*dt/ROLL_K*(0.2+0.8*q*q);
+        px=creepEnd+x;
       }
-      /* за краем экрана колесо катится ещё полсекунды, потом возвращается слева */
-      return x >= right+140 && t > 1000;
+      setDisc(px, fallY(t));
+      if(hits<3 && t>=[LEAVE,HIT1,HIT2][hits]){
+        hits++;
+        if(!reducedMotion()){
+          sparkBurst(hits===1?4:(hits===2?6:3), CX+creep(t), hits===1?34:FLOOR_Y-6, hits>1);
+          shakeMount();
+        }
+      }
+      /* за краем экрана колесо катится ещё немного, потом возвращается слева */
+      return px >= right+140 && t > SETTLE+900;
     }, ()=> rollBack(done));
   }
   /* возвращается слева, накатом, с той же скоростью, и доезжает до станины */
