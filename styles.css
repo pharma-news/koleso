@@ -158,7 +158,7 @@ html[data-theme=light] .wheel-frame{filter:drop-shadow(0 18px 26px rgba(70,50,25
 .strike{stroke:#8e3324; stroke-width:2.6; stroke-linecap:round; opacity:0; transition:opacity .25s}
 .strike.done{opacity:.85}
 /* римские номера секторов — гравировка по латуни */
-.roman{fill:#dcb877; stroke:rgba(12,8,3,.55); stroke-width:.55px; paint-order:stroke; letter-spacing:1.2px;
+.roman{fill:#dcb877; stroke:rgba(12,8,3,.55); stroke-width:.5px; paint-order:stroke; letter-spacing:.5px;
   font-weight:700; font-family:var(--serif); opacity:.9}
 .sheen{opacity:.9}
 .mount-txt{fill:var(--brass); font-size:11px; letter-spacing:3px; font-weight:700; font-family:var(--font)}

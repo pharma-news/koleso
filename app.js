@@ -216,7 +216,7 @@ function buildWheel(){
     const outer=svgEl('g',{transform:`rotate(${phi} ${CX} ${CY})`});
     const inner=svgEl('g',{});
     if(phi>90 && phi<270){ inner.setAttribute('transform',`rotate(180 ${CX} ${CY-ROMAN_R})`); }
-    const num=svgEl('text',{class:'roman',x:CX,y:(CY-ROMAN_R+4.6).toFixed(2),'font-size':'13','text-anchor':'middle'});
+    const num=svgEl('text',{class:'roman',x:CX,y:(CY-ROMAN_R+3.6).toFixed(2),'font-size':'10','text-anchor':'middle'});
     num.textContent=ROMAN[i];
     inner.appendChild(num);
     outer.appendChild(inner);
@@ -341,11 +341,14 @@ function fxInit(){
   sparks=[];
   sparkNodes=Array.from(document.querySelectorAll('#fx .spark'));
 }
-/* молоточек бьёт по штырьку — летят латунные искры */
-function sparkBurst(n){
+/* молоточек бьёт по штырьку — летят латунные искры;
+   можно указать своё место удара (например, точку на полу) и разлёт в обе стороны */
+function sparkBurst(n, ox, oy, both){
+  const X=(ox===undefined? CX : ox), Y=(oy===undefined? 33 : oy);
   for(let k=0;k<n && sparks.length<SPARK_MAX;k++){
-    sparks.push({ x:CX+(Math.random()*8-4), y:33+(Math.random()*6-3),
-      vx:0.18+Math.random()*0.4, vy:-(0.05+Math.random()*0.3),
+    const dir=both ? (Math.random()<0.5?-1:1) : 1;
+    sparks.push({ x:X+(Math.random()*8-4), y:Y+(Math.random()*6-3),
+      vx:dir*(0.18+Math.random()*0.4), vy:-(0.05+Math.random()*0.32),
       age:0, life:160+Math.random()*230, r:0.7+Math.random()*1.2 });
   }
   if(!fxRAF){ fxDtLast=performance.now(); fxRAF=requestAnimationFrame(fxStep); }
@@ -405,6 +408,8 @@ const ESCAPE_EVERY=10;                            /* каждое 10-е вращ
 const ROLL_K=180/(Math.PI*(BAND_R+BAND_W/2));     /* градусов поворота на единицу пути: качение без проскальзывания */
 const FLOOR_Y=436;                                /* пол: низ основания станины */
 const FLOOR_DROP=FLOOR_Y-(BAND_R+BAND_W/2)-CY;    /* на сколько колесо опустится, встав на пол (51) */
+const ESCAPE_V=0.62;                              /* предельная скорость побега, градусов на миллисекунду */
+function slotOf(a){ return Math.round((((a%360)+360)%360)/TAU); }
 function reducedMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
 
 /* на сколько единиц viewBox сдвинуть колесо, чтобы оно скрыто уехало за край экрана */
@@ -489,14 +494,13 @@ function spin(){
       rollShadow.setAttribute('opacity',(clamp(1-Math.abs(yy-FLOOR_DROP)/42,0,1)*0.5).toFixed(2));
     }
   };
-  const decayPawl=()=>{ pawlAngle+=(0-pawlAngle)*0.22; setPawl(pawlAngle); };
 
   function phase(ms, onFrame, onDone){
     const t0=performance.now();
     (function f(now){
       const p=Math.min(1,(now-t0)/ms);
-      onFrame(p);
-      if(p<1) requestAnimationFrame(f); else onDone();
+      const early=onFrame(p, now)===true;            /* фаза может закончиться раньше срока */
+      if(!early && p<1) requestAnimationFrame(f); else onDone();
     })(performance.now());
   }
   /* ближайший угол, на котором нужный сектор встанет на стрелку */
@@ -542,76 +546,114 @@ function spin(){
     }, done);
   }
 
-  /* --- побег колеса: соскок с оси, падение на пол, качение, возврат, прыжок на ось --- */
-  function roll(x, prevX){
-    const dx=x-prevX;
-    rot+=dx*ROLL_K;                                 /* качение без проскальзывания */
+  /* --- побег колеса: разгон до предела, слёт с оси, качение, прыжок на ось ---
+     Всю дорогу живёт одна величина v — скорость вращения в градусах на
+     миллисекунду. Она меняется плавно (экспоненциально к цели), поэтому
+     колесо нигде не дёргается: ни в момент слёта, ни в момент посадки. */
+  let v=0, prevT=performance.now(), prevSlot=slotOf(rot), onAxle=true;
+  function chase(target, dt){ v += (target-v)*Math.min(1, dt*0.004); }
+  function drawSpin(dt){
     rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
-    if(!reducedMotion()) setGlow(clamp(Math.abs(dx)*ROLL_K*5, 0, V_REF));
-    return x;
+    if(reducedMotion()) return;
+    rotor.style.filter = v>0.18 ? `blur(${clamp(v*4,0,3).toFixed(2)}px)` : '';
+    setGlow(v);
+    if(onAxle){                                  /* молоточек щёлкает только по своим штырькам */
+      const slot=slotOf(rot);
+      if(slot!==prevSlot){
+        pawlAngle=Math.min(11, 4+v*14);
+        if(v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
+        prevSlot=slot;
+      }
+    }
+    pawlAngle+=(0-pawlAngle)*Math.min(1, dt/70);
+    setPawl(pawlAngle);
   }
-  /* высота центра: соскок с оси -> падение на пол -> отскоки -> качение по полу */
-  function awayCurve(p){
-    if(p<0.10) return -16*Math.sin((p/0.10)*Math.PI/2);
-    if(p<0.30){ const q=(p-0.10)/0.20; return -16+(FLOOR_DROP+16)*q*q; }
-    if(p<0.50){ const q=(p-0.30)/0.20; return FLOOR_DROP-17*Math.sin(q*Math.PI); }
-    if(p<0.66){ const q=(p-0.50)/0.16; return FLOOR_DROP-7*Math.sin(q*Math.PI); }
-    return FLOOR_DROP+2*Math.sin(p*Math.PI*9);
+  function spinBy(dt){ rot+=v*dt; drawSpin(dt); }
+  function tick(now){ const dt=Math.max(1, now-prevT); prevT=now; return dt; }
+
+  /* разгон: скорость растёт до предельной и к моменту слёта уже не растёт */
+  function windUpTo(maxSpeed, ms, done){
+    v=0.16; prevT=performance.now(); prevSlot=slotOf(rot);
+    phase(ms, (p, now)=>{ const dt=tick(now); chase(maxSpeed, dt); spinBy(dt); }, done);
   }
-  /* обратная дорога: из прыжка с пола на ось, посадка, отскок */
-  function mountCurve(p){
-    if(p<0.34){ const q=p/0.34; return FLOOR_DROP-(FLOOR_DROP+26)*Math.sin(q*Math.PI/2); }
-    if(p<0.62){ const q=(p-0.34)/0.28; return -26+26*q*q; }
-    if(p<0.84){ const q=(p-0.62)/0.22; return -9*Math.sin(q*Math.PI); }
-    return 0;
-  }
-  function escapeRun(done){
-    const right=offscreenShift(1), left=-offscreenShift(-1);
-    let prevX=0, hits=0;
-    const touch=[0.30,0.50,0.66];                   /* моменты касания пола */
-    rotor.style.filter='';
-    /* сорвалось: подскок, соскок с оси, звонкий удар об пол и качение вправо */
-    phase(1050, (p)=>{
-      const x=right*(p*p*0.85+p*0.15);
-      setDisc(x, awayCurve(p));
-      prevX=roll(x, prevX);
-      if(hits<touch.length && p>=touch[hits]){
+  /* слёт: соскок с оси, звонкий удар об пол и качение вправо на той же скорости */
+  function flyOff(done){
+    const right=offscreenShift(1), F=FLOOR_DROP;
+    const t0=performance.now(); prevT=t0;
+    let x=0, hits=0;
+    const touch=[150, 490, 870];                     /* соскок, удар об пол, отскок */
+    function fallY(t){
+      if(t<150) return -16*Math.sin((t/150)*Math.PI/2);
+      if(t<490){ const q=(t-150)/340; return -16+(F+16)*q*q; }
+      if(t<870){ const q=(t-490)/380; return F-13*Math.sin(q*Math.PI); }
+      if(t<1210){ const q=(t-870)/340; return F-5*Math.sin(q*Math.PI); }
+      return F+1.8*Math.sin(t/260);
+    }
+    onAxle=false;
+    phase(9000, (p, now)=>{
+      const dt=tick(now), t=now-t0;
+      chase(ESCAPE_V, dt);
+      x += v*dt/ROLL_K;                              /* путь строго связан с углом: качение */
+      spinBy(dt);
+      setDisc(x, fallY(t));
+      if(hits<touch.length && t>=touch[hits]){
         hits++;
-        pawlAngle=12; setPawl(pawlAngle);
-        if(!reducedMotion()){ sparkBurst(hits===1?5:3); shakeMount(); }
-      } else decayPawl();
-    }, ()=>{
-      /* за экраном — короткая пауза, потом колесо возвращается слева по полу */
-      phase(460, ()=>{}, ()=>{
-        prevX=left; setDisc(left, FLOOR_DROP);
-        phase(1000, (p)=>{
-          const e=1-Math.pow(1-p, 1.9);
-          const x=left*(1-e);
-          setDisc(x, FLOOR_DROP+2.5*Math.sin(p*Math.PI*7));
-          prevX=roll(x, prevX);
-          decayPawl();
-        }, ()=> jumpToAxle(done));
-      });
-    });
+        if(!reducedMotion() && hits>1){ sparkBurst(hits===2?6:3, CX+x, FLOOR_Y-6, true); shakeMount(); }
+      }
+      /* за краем экрана колесо катится ещё полсекунды, потом возвращается слева */
+      return x >= right+140 && t > 1000;
+    }, ()=> rollBack(done));
   }
-  /* с пола — прыжок вверх, точно на ось, и два маленьких отскока */
-  function jumpToAxle(done){
-    let hits=0, prevP=0;
-    const touch=[0.62,0.84], SPIN_UP=300;           /* в воздухе колесо делает ещё пол-оборота */
-    phase(900, (p)=>{
-      rot+=(p-prevP)*SPIN_UP; prevP=p;
-      rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
-      setDisc(0, mountCurve(p));
-      if(hits<touch.length && p>=touch[hits]){
+  /* возвращается слева, накатом, с той же скоростью, и доезжает до станины */
+  function rollBack(done){
+    const left=-offscreenShift(-1);
+    let x=left; const t0=performance.now(); prevT=t0;
+    setDisc(x, FLOOR_DROP);
+    phase(9000, (p, now)=>{
+      const dt=tick(now), t=now-t0;
+      chase(ESCAPE_V, dt);
+      x += v*dt/ROLL_K;
+      spinBy(dt);
+      setDisc(Math.min(0, x), FLOOR_DROP+1.8*Math.sin(t/260));
+      return x >= 0;
+    }, ()=> leapToAxle(done));
+  }
+  /* прыжок с пола на ось: в воздухе колесо крутится ровно с той же скоростью */
+  function leapToAxle(done){
+    const F=FLOOR_DROP, t0=performance.now(); prevT=t0;
+    let hits=0;
+    phase(780, (p, now)=>{
+      const dt=tick(now), t=now-t0;
+      chase(ESCAPE_V, dt);
+      spinBy(dt);
+      let y;
+      if(t<300)      y=F-(F+20)*Math.sin((t/300)*Math.PI/2);
+      else if(t<560){ const q=(t-300)/260; y=-20+20*q*q; }
+      else if(t<740){ const q=(t-560)/180; y=-7*Math.sin(q*Math.PI); }
+      else            y=0;
+      setDisc(0, y);
+      if((t>=560 && hits===0) || (t>=740 && hits===1)){
         hits++;
+        onAxle=true; prevSlot=slotOf(rot);
         pawlAngle=hits===1?13:8; setPawl(pawlAngle);
         if(!reducedMotion()){ sparkBurst(hits===1?5:2); shakeMount(); }
-      } else decayPawl();
-    }, ()=>{
-      setDisc(0, 0);
-      /* и как ни в чём не бывало доращивает вращение до нужного сектора */
-      run(rot, nextTarget(rot+720, 1+Math.floor(Math.random()*2)), dur*0.42, done);
-    });
+      }
+      return t>=780;
+    }, ()=> brakeToTarget(done));
+  }
+  /* плавное торможение: начинаем ровно с текущей скорости и гасим её до нуля
+     как раз на нужном секторе — без единого рывка */
+  function brakeToTarget(done){
+    const start=rot, v0=Math.max(0.2, v);
+    const D=nextTarget(start+360, 1)-start;
+    const T=2*D/v0;                                  /* при таком T начальная скорость совпадает */
+    prevT=performance.now(); prevSlot=slotOf(start);
+    phase(T, (p, now)=>{
+      const dt=tick(now);
+      rot = start + D*(1-Math.pow(1-p, 2));
+      v   = 2*D*(1-p)/T;
+      drawSpin(dt);
+    }, done);
   }
 
   /* финальное «докачивание» тяжёлого колеса */
@@ -646,9 +688,11 @@ function spin(){
     showWord(i);
   }
   const finish=()=> settle();
-
-  wind(()=> run(from-BACK, (escape? from+(toFull-from)*0.5 : toFull), (escape? dur*0.55 : dur),
-    ()=> escape? escapeRun(finish) : finish()));
+  if(escape){
+    wind(()=> windUpTo(ESCAPE_V, 1700, ()=> flyOff(finish)));
+  } else {
+    wind(()=> run(from-BACK, toFull, dur, finish));
+  }
 }
 
 /* ------------------------------ результат ------------------------------ */
@@ -676,7 +720,7 @@ function renderFound(){
   const box=$('#found-list');
   const chip=$('#btn-reset');
   if(chip) chip.textContent = state.found.length? '↺ Сначала · '+state.found.length : '↺ Сначала';
-  if(!state.found.length){ box.innerHTML='<span class="empty-note">Пока ничего не нашли — крути колесо и ищи слово в книгах.</span>'; return; }
+  if(!state.found.length){ box.innerHTML='<span class="empty-note">Пока ничего не нашли — крутите колесо и ищите слово в книгах.</span>'; return; }
   box.innerHTML=state.found.slice().reverse().map(f=>'<span class="fchip">'+f.w+' <small>'+f.t+'</small></span>').join('');
 }
 function markFound(){
