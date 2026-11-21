@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>Колесо слов — крути, найди слово и расскажи, что оно значит</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%A1%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
 
@@ -15,7 +15,10 @@
     <span class="logo">🎡</span>
     <span class="brand-text"><b>Колесо слов</b><small>крути · найди слово в книгах · объясни</small></span>
   </div>
-  <button class="chip btn-theme" id="btn-theme" title="Светлая или ночная тема">🌙 Ночная</button>
+  <div class="top-actions">
+    <button class="chip" id="btn-reset" title="Начать заново: зачёркнутые слова вернутся на колесо">↺ Сначала</button>
+    <button class="chip btn-theme" id="btn-theme" title="Светлая или ночная тема">🌙 Ночная</button>
+  </div>
 </header>
 
 <main>
@@ -51,6 +54,6 @@
   </section>
 </main>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

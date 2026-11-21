@@ -233,11 +233,14 @@ function buildWheel(){
     const g=svgEl('g',{transform:`rotate(${phi} ${CX} ${CY})`,'data-i':i});
     g.appendChild(svgEl('rect',{class:'plate','data-i':i, x:(CX-PLATE_H/2).toFixed(2), y:y0.toFixed(2),
       width:PLATE_H, height:len.toFixed(2), rx:'9', ry:'9'}));
-    const t=svgEl('text',{class:'plate-txt', x:CX, y:cy.toFixed(2), 'font-size':size,
+    const t=svgEl('text',{class:'plate-txt', 'data-i':i, x:CX, y:cy.toFixed(2), 'font-size':size,
       'text-anchor':'middle', 'dominant-baseline':'central',
       transform:`rotate(90 ${CX} ${cy.toFixed(2)})`});
     t.textContent=txt.toUpperCase();
     g.appendChild(t);
+    /* зачёркивание: отдельная линия вдоль слова (в SVG text-decoration ненадёжен) */
+    g.appendChild(svgEl('line',{class:'strike','data-i':i, x1:CX, x2:CX,
+      y1:(cy-(len-18)/2).toFixed(2), y2:(cy+(len-18)/2).toFixed(2)}));
     rotor.appendChild(g);
   }
 
@@ -308,7 +311,15 @@ function buildWheel(){
   svg.appendChild(pawl);
 
   highlight(lastWin);
+  markDone();
   fxInit();
+}
+/* объяснённые слова зачёркиваются на колесе */
+function markDone(){
+  const done=new Set(state.found.map(f=>String(f.w).toLowerCase()));
+  document.querySelectorAll('#wheel .plate, #wheel .plate-txt, #wheel .strike').forEach(el=>{
+    el.classList.toggle('done', done.has(String(words[Number(el.dataset.i)]).toLowerCase()));
+  });
 }
 function highlight(i){
   document.querySelectorAll('#wheel .sector').forEach(s=>s.classList.toggle('win', Number(s.dataset.i)===i));
@@ -414,17 +425,43 @@ function shakeMount(){
   m.classList.remove('shake'); void m.getBoundingClientRect(); m.classList.add('shake');
 }
 
+/* слова, которые ещё не объясняли */
+function available(){
+  const done=new Set(state.found.map(f=>String(f.w).toLowerCase()));
+  const pool=[];
+  for(let i=0;i<words.length;i++) if(!done.has(String(words[i]).toLowerCase())) pool.push(i);
+  return pool;
+}
 function pickWinner(){
-  let i=Math.floor(Math.random()*SECTORS);
-  if(i===lastWin) i=(i+1+Math.floor(Math.random()*(SECTORS-1)))%SECTORS;
+  const pool=available();
+  if(!pool.length) return -1;
+  let i=pool[Math.floor(Math.random()*pool.length)];
+  if(i===lastWin && pool.length>1)
+    i=pool[(pool.indexOf(i)+1+Math.floor(Math.random()*(pool.length-1)))%pool.length];
   lastWin=i;
   return i;
 }
+/* колесо объяснено целиком: крутить больше нечего */
+function allExplained(){
+  $('#word').textContent='✓';
+  $('#task').textContent='Все слова объяснены. Нажмите «Сначала» — и они снова встанут на колесо.';
+  $('#word-card').classList.add('hot');
+  $('#found').disabled=true;
+  $('#spin').disabled=true;
+  $('#again').disabled=true;
+}
+function updateSpinState(){
+  const left=available().length;
+  $('#spin').disabled = left===0;
+  $('#again').disabled = left===0;
+  return left;
+}
 function spin(){
   if(spinning) return;
+  const i=pickWinner();
+  if(i<0){ allExplained(); return; }
   state.spins=(state.spins||0)+1; save();
   const escape=(state.spins%ESCAPE_EVERY===0) && !reducedMotion();
-  const i=pickWinner();
   const jitter=(Math.random()*2-1)*11;              /* стрелка встаёт внутрь сектора */
   const target=(((-(i*TAU+TAU/2)-jitter)%360)+360)%360;
   const turns=SPIN.turns+Math.floor(Math.random()*(SPIN.extra+1));
@@ -637,6 +674,8 @@ function showWord(i){
 /* ------------------------------ список найденных ------------------------------ */
 function renderFound(){
   const box=$('#found-list');
+  const chip=$('#btn-reset');
+  if(chip) chip.textContent = state.found.length? '↺ Сначала · '+state.found.length : '↺ Сначала';
   if(!state.found.length){ box.innerHTML='<span class="empty-note">Пока ничего не нашли — крути колесо и ищи слово в книгах.</span>'; return; }
   box.innerHTML=state.found.slice().reverse().map(f=>'<span class="fchip">'+f.w+' <small>'+f.t+'</small></span>').join('');
 }
@@ -645,7 +684,8 @@ function markFound(){
   if(!w || w==='—' || alreadyFound(w)) return;
   const t=new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   state.found.push({w:w,t:t});
-  save(); renderFound();
+  save(); renderFound(); markDone();
+  if(!updateSpinState()) allExplained();
   $('#found').disabled=true;
 }
 function alreadyFound(w){
@@ -675,7 +715,13 @@ $('#found').addEventListener('click',markFound);
 $('#clear-found').addEventListener('click',()=>{
   if(!state.found.length) return;
   if(!confirm('Удалить список найденных слов?')) return;
-  state.found=[]; save(); renderFound();
+  state.found=[]; save(); renderFound(); markDone(); updateSpinState();
+});
+$('#btn-reset').addEventListener('click',()=>{
+  if(!state.found.length && !state.spins) return;
+  if(!confirm('Начать заново? Список объяснённых слов очистится, и все слова снова встанут на колесо.')) return;
+  state.found=[]; state.spins=0; save();
+  renderFound(); markDone(); highlight(-1); resetCard(); updateSpinState();
 });
 $('#btn-theme').addEventListener('click',toggleTheme);
 document.addEventListener('keydown',e=>{
@@ -693,4 +739,5 @@ rot=-(Math.floor(Math.random()*SECTORS)*TAU + TAU/2);
 applyTheme();
 renderFound();
 resetCard();
+updateSpinState();
 setPawl(0);

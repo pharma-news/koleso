@@ -53,6 +53,7 @@ main{max-width:1060px; margin:0 auto; padding:16px 14px; display:grid; gap:18px}
   border-radius:999px; font-size:.88rem}
 button.chip{cursor:pointer; min-height:40px; touch-action:manipulation; transition:.14s}
 button.chip:hover{border-color:var(--brass); color:var(--brass)}
+.top-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
 
 /* --------------------------- колесо --------------------------- */
 .wheel-zone{display:flex; flex-direction:column; align-items:center; gap:18px}
@@ -80,6 +81,11 @@ html[data-theme=light] .wheel-frame{filter:drop-shadow(0 18px 26px rgba(70,50,25
 .plate{fill:#f2e9d6; stroke:rgba(28,20,10,.55); stroke-width:1.4}
 .plate-txt{fill:#241b10; font-weight:700; letter-spacing:.7px; text-anchor:middle; font-family:var(--font)}
 .plate.hot{fill:#fff8e6; stroke:var(--brass-deep); stroke-width:2.2; filter:drop-shadow(0 0 8px rgba(201,163,92,.6))}
+/* объяснённое слово: плашка тускнеет, слово зачёркнуто линией вдоль текста */
+.plate.done{fill:#c8bda8; stroke:rgba(28,20,10,.5)}
+.plate-txt.done{fill:#6b604c}
+.strike{stroke:#8e3324; stroke-width:2.6; stroke-linecap:round; opacity:0; transition:opacity .25s}
+.strike.done{opacity:.85}
 /* римские номера секторов — гравировка по латуни */
 .roman{fill:#dcb877; stroke:rgba(12,8,3,.55); stroke-width:.55px; paint-order:stroke; letter-spacing:1.2px;
   font-weight:700; font-family:var(--serif); opacity:.9}
