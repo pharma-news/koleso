@@ -108,6 +108,12 @@ function buildWheel(){
     .forEach(s=>sheen.appendChild(s));
   defs.appendChild(sheen);
 
+  /* тёплое свечение по ободу, растёт вместе со скоростью */
+  const haloG=svgEl('radialGradient',{id:'haloG'});
+  stops([['0%','rgba(255,200,110,0)'],['62%','rgba(255,200,110,.08)'],
+    ['82%','rgba(255,206,120,.45)'],['100%','rgba(255,160,60,0)']]).forEach(s=>haloG.appendChild(s));
+  defs.appendChild(haloG);
+
   const blur=svgEl('filter',{id:'softShadow',x:'-30%',y:'-30%',width:'160%',height:'160%'});
   blur.appendChild(svgEl('feGaussianBlur',{stdDeviation:'7'}));
   defs.appendChild(blur);
@@ -125,6 +131,9 @@ function buildWheel(){
   defs.appendChild(grainFilter('grainHub','0.055','0.045','4',[0.11,0.07,0.03],-0.86));
 
   svg.appendChild(defs);
+
+  /* свечение за колесом */
+  svg.appendChild(svgEl('circle',{id:'halo',cx:CX,cy:CY,r:R+72,fill:'url(#haloG)',opacity:'0','pointer-events':'none'}));
 
   /* ---- станина: тень на полу, ножки, основание ---- */
   const mount=svgEl('g',{id:'mount'});
@@ -165,6 +174,14 @@ function buildWheel(){
     rotor.appendChild(svgEl('circle',{cx:x.toFixed(2),cy:y.toFixed(2),r:'3.4',fill:'url(#brassR)',stroke:'rgba(18,11,4,.65)','stroke-width':'.9'}));
     rotor.appendChild(svgEl('circle',{cx:(x-1).toFixed(2),cy:(y-1.2).toFixed(2),r:'1',fill:'rgba(255,246,214,.75)'}));
   }
+
+  /* смазанные полосы по ободу: видны только на скорости */
+  const streaks=svgEl('g',{id:'streaks',opacity:'0','pointer-events':'none'});
+  for(const rr of [BAND_R-8, BAND_R+1, BAND_R+9]){
+    streaks.appendChild(svgEl('circle',{cx:CX,cy:CY,r:rr,fill:'none',stroke:'rgba(255,238,198,.6)','stroke-width':'2',
+      'stroke-linecap':'round','stroke-dasharray':'64 220 38 268 86 196'}));
+  }
+  rotor.appendChild(streaks);
 
   /* сектора */
   for(let i=0;i<SECTORS;i++){
@@ -260,6 +277,17 @@ function buildWheel(){
   for(const bx of [189,211]){
     svg.appendChild(svgEl('circle',{cx:bx,cy:'6',r:'2.2',fill:'url(#brassR)',stroke:'rgba(20,12,4,.6)','stroke-width':'.7'}));
   }
+  /* искры из-под молоточка */
+  const fx=svgEl('g',{id:'fx','pointer-events':'none'});
+  for(let i=0;i<SPARK_MAX;i++) fx.appendChild(svgEl('circle',{class:'spark',r:'1',cx:'-20',cy:'-20',opacity:'0'}));
+  svg.appendChild(fx);
+
+  /* ударная волна при остановке */
+  const shock=svgEl('g',{id:'shock','pointer-events':'none'});
+  shock.appendChild(svgEl('circle',{cx:CX,cy:'30',r:'26',fill:'none',stroke:'rgba(255,226,158,.9)','stroke-width':'3.4'}));
+  shock.appendChild(svgEl('circle',{cx:CX,cy:'30',r:'40',fill:'none',stroke:'rgba(255,196,110,.45)','stroke-width':'1.8'}));
+  svg.appendChild(shock);
+
   const pawl=svgEl('g',{id:'pawl'});
   /* пружина */
   pawl.appendChild(svgEl('path',{d:'M207,14 q9,6 4,14',fill:'none',stroke:'rgba(222,186,116,.55)','stroke-width':'1.6'}));
@@ -270,11 +298,12 @@ function buildWheel(){
   pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'8.5',fill:'url(#brassR)',stroke:'rgba(24,15,5,.8)','stroke-width':'1.8'}));
   pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'2.6',fill:'#2a1d0d'}));
   /* ударный шарик, который сидит на штырьках */
-  pawl.appendChild(svgEl('circle',{cx:CX,cy:'33',r:'4.4',fill:'url(#brassR)',stroke:'rgba(24,15,5,.75)','stroke-width':'1.2'}));
+  pawl.appendChild(svgEl('circle',{class:'foot',cx:CX,cy:'33',r:'4.4',fill:'url(#brassR)',stroke:'rgba(24,15,5,.75)','stroke-width':'1.2'}));
   pawl.appendChild(svgEl('circle',{cx:CX-1.4,cy:'31.4',r:'1.4',fill:'rgba(255,250,226,.85)'}));
   svg.appendChild(pawl);
 
   highlight(lastWin);
+  fxInit();
 }
 function highlight(i){
   document.querySelectorAll('#wheel .sector').forEach(s=>s.classList.toggle('win', Number(s.dataset.i)===i));
@@ -285,6 +314,60 @@ function setPawl(deg){
   if(!p) return;
   /* когда молоточек в покое, снимаем inline-стиль — тогда работает :hover */
   p.style.transform = Math.abs(deg)<0.06 ? '' : `rotate(${deg.toFixed(2)}deg)`;
+}
+
+/* ------------------------------ искры и свечение ------------------------------ */
+const SPARK_MAX=48;
+let sparks=[], sparkNodes=[], fxRAF=null, fxDtLast=0;
+
+function fxInit(){
+  if(fxRAF){ cancelAnimationFrame(fxRAF); fxRAF=null; }
+  sparks=[];
+  sparkNodes=Array.from(document.querySelectorAll('#fx .spark'));
+}
+/* молоточек бьёт по штырьку — летят латунные искры */
+function sparkBurst(n){
+  for(let k=0;k<n && sparks.length<SPARK_MAX;k++){
+    sparks.push({ x:CX+(Math.random()*8-4), y:33+(Math.random()*6-3),
+      vx:0.18+Math.random()*0.4, vy:-(0.05+Math.random()*0.3),
+      age:0, life:160+Math.random()*230, r:0.7+Math.random()*1.2 });
+  }
+  if(!fxRAF){ fxDtLast=performance.now(); fxRAF=requestAnimationFrame(fxStep); }
+}
+function fxStep(now){
+  const dt=Math.min(48, (now-fxDtLast)||16); fxDtLast=now;
+  for(let i=sparks.length-1;i>=0;i--){
+    const s=sparks[i];
+    s.age+=dt;
+    if(s.age>=s.life){ sparks.splice(i,1); continue; }
+    s.vy+=0.0012*dt;                /* гравитация */
+    s.vx*=(1-0.0035*dt);            /* сопротивление воздуха */
+    s.x+=s.vx*dt; s.y+=s.vy*dt;
+  }
+  for(let i=0;i<sparkNodes.length;i++){
+    const s=sparks[i], node=sparkNodes[i];
+    if(!s){ node.setAttribute('opacity','0'); continue; }
+    const k=1-s.age/s.life;
+    node.setAttribute('cx', s.x.toFixed(2));
+    node.setAttribute('cy', s.y.toFixed(2));
+    node.setAttribute('r', (s.r*(0.55+k*0.85)).toFixed(2));
+    node.setAttribute('opacity', (0.2+0.8*k).toFixed(2));
+  }
+  if(sparks.length) fxRAF=requestAnimationFrame(fxStep);
+  else { fxRAF=null; for(const n of sparkNodes) n.setAttribute('opacity','0'); }
+}
+const V_REF=0.55;                    /* типичная пиковая скорость, градусов на миллисекунду */
+function setGlow(v){
+  const k=clamp(v/V_REF, 0, 1);
+  const h=$('#halo');
+  if(h) h.setAttribute('opacity', (k*0.8).toFixed(3));
+  const s=$('#streaks');
+  if(s) s.setAttribute('opacity', (k*0.55).toFixed(3));
+}
+function shockWave(){
+  const s=$('#shock');
+  if(!s) return;
+  s.classList.remove('go'); void s.getBoundingClientRect(); s.classList.add('go');
 }
 
 /* ------------------------------ вращение ------------------------------ */
@@ -353,11 +436,18 @@ function spin(){
     const dt=Math.max(1, now-prevT);
     const v=(rot-prevRot)/dt;                       /* градусов за миллисекунду */
     prevRot=rot; prevT=now;
-    if(!reducedMotion()){ rotor.style.filter = v>0.3 ? `blur(${clamp(v*0.7,0,2.4).toFixed(2)}px)` : ''; }
+    if(!reducedMotion()){ rotor.style.filter = v>0.18 ? `blur(${clamp(v*4,0,3).toFixed(2)}px)` : ''; }
 
-    /* защёлку подбрасывает каждый штырёк */
+    /* чем быстрее крутится, тем жарче: свечение и полосы по ободу */
+    if(!reducedMotion()) setGlow(v);
+
+    /* защёлку подбрасывает каждый штырёк, от удара летят искры */
     const slot=Math.round(((rot%360)+360)%360/TAU);
-    if(slot!==prevSlot){ pawlAngle=Math.min(11, 4+v*1.4); prevSlot=slot; }
+    if(slot!==prevSlot){
+      pawlAngle=Math.min(11, 4+v*14);
+      if(!reducedMotion() && v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
+      prevSlot=slot;
+    }
     pawlAngle+=(0-pawlAngle)*Math.min(1, dt/70);
     setPawl(pawlAngle);
 
@@ -374,6 +464,7 @@ function spin(){
       rotor.setAttribute('transform',`rotate(${(rot+wob).toFixed(2)} ${CX} ${CY})`);
       pawlAngle=Math.sin(p*Math.PI*3)*(1-p)*4;
       setPawl(pawlAngle);
+      setGlow(V_REF*0.3*(1-p));
       if(p<1) requestAnimationFrame(s); else land(i);
     }
     if(durS===0) land(i); else requestAnimationFrame(s);
@@ -382,6 +473,8 @@ function spin(){
     rotor.style.filter='';
     $('#rotor').setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
     setPawl(0);
+    setGlow(0);
+    if(!reducedMotion()) shockWave();
     spinning=false;
     $('#spin').classList.remove('busy');
     $('#wheel-tap').classList.remove('busy');
@@ -396,7 +489,7 @@ function spin(){
 /* ------------------------------ результат ------------------------------ */
 function resetCard(){
   $('#word').textContent='—';
-  $('#task').textContent='Найдите это слово в словаре или энциклопедии на столе и скажите, что оно обозначает.';
+  $('#task').textContent='Найдите это слово в словаре или энциклопедии и скажите, что оно обозначает.';
   $('#word-card').classList.remove('hot');
   $('#found').disabled=true;
 }
@@ -407,7 +500,7 @@ function showWord(i){
   const card=$('#word-card');
   card.style.setProperty('--accent', accentOf(i));
   card.classList.add('hot');
-  $('#task').textContent='Найдите слово «'+w+'» в словаре или энциклопедии на столе и расскажите, что оно обозначает.';
+  $('#task').textContent='Найдите слово «'+w+'» в словаре или энциклопедии и расскажите, что оно обозначает.';
   $('#found').disabled=alreadyFound(w);
   card.classList.remove('hit'); void card.offsetWidth; card.classList.add('hit');
   card.scrollIntoView({behavior:reducedMotion()?'auto':'smooth', block:'nearest'});
