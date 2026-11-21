@@ -36,8 +36,8 @@ let state=loadState();
 function loadState(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY)||'null')||{};
-    return { theme: s.theme||'auto', found: Array.isArray(s.found)? s.found : [] };
-  }catch(e){ return { theme:'auto', found:[] }; }
+    return { theme: s.theme||'auto', found: Array.isArray(s.found)? s.found : [], spins: s.spins||0 };
+  }catch(e){ return { theme:'auto', found:[], spins:0 }; }
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
 
@@ -155,6 +155,7 @@ function buildWheel(){
   svg.appendChild(mount);
 
   /* ---- ротор: обод, сектора, плашки, штырьки ---- */
+  const disc=svgEl('g',{id:'disc'});             /* всё колесо: его можно сдвинуть, станина остаётся */
   const rotor=svgEl('g',{id:'rotor'});
   rotor.setAttribute('transform',`rotate(${rot} ${CX} ${CY})`);
 
@@ -257,15 +258,16 @@ function buildWheel(){
     const x=CX+33*Math.cos(a), y=CY+33*Math.sin(a);
     rotor.appendChild(svgEl('circle',{cx:x.toFixed(2),cy:y.toFixed(2),r:'3.6',fill:'url(#brassR)',stroke:'rgba(16,10,4,.7)','stroke-width':'.9'}));
   }
-  svg.appendChild(rotor);
+  disc.appendChild(rotor);
 
-  /* неподвижный блик/свет поверх колеса */
-  svg.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R+2,fill:'url(#sheen)',class:'sheen','pointer-events':'none'}));
+  /* блик/свет поверх колеса */
+  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R+2,fill:'url(#sheen)',class:'sheen','pointer-events':'none'}));
 
-  /* неподвижная ось */
-  svg.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'20',fill:'url(#brassR)',stroke:'rgba(18,11,4,.65)','stroke-width':'2'}));
-  svg.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'7',fill:'#241a0d'}));
-  svg.appendChild(svgEl('circle',{cx:CX-4,cy:CY-5,r:'3',fill:'rgba(255,248,222,.6)'}));
+  /* ось */
+  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'20',fill:'url(#brassR)',stroke:'rgba(18,11,4,.65)','stroke-width':'2'}));
+  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'7',fill:'#241a0d'}));
+  disc.appendChild(svgEl('circle',{cx:CX-4,cy:CY-5,r:'3',fill:'rgba(255,248,222,.6)'}));
+  svg.appendChild(disc);
 
   /* тень молоточка, падающая на лицо колеса */
   svg.appendChild(svgEl('ellipse',{cx:CX,cy:CY-R+26,rx:'16',ry:'24',fill:'rgba(0,0,0,.28)',
@@ -385,7 +387,27 @@ function heavyEase(p){
   return PROFILE[i]+(PROFILE[j]-PROFILE[i])*f;
 }
 const SPIN={ turns:7, extra:3, dur:7600, tail:2600, wob:900 };
+const ESCAPE_EVERY=10;                            /* каждое 10-е вращение колесо срывается и укатывается */
+const ROLL_K=180/(Math.PI*(BAND_R+BAND_W/2));     /* градусов поворота на единицу пути: качение без проскальзывания */
 function reducedMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
+
+/* на сколько единиц viewBox сдвинуть колесо, чтобы оно скрыто уехало за край экрана */
+function offscreenShift(dir){
+  const fr=$('#wheel-frame').getBoundingClientRect();
+  const k=400/Math.max(1, fr.width);              /* единиц viewBox на CSS-пиксель */
+  const cx=fr.left+fr.width/2;                    /* центр колеса на экране */
+  const rad=fr.width*(BAND_R+BAND_W/2+8)/400;     /* радиус колеса в CSS-пикселях */
+  /* вправо: левый край колеса должен уйти за правый край экрана;
+     влево: правый край — за левый край экрана */
+  const px = dir>0 ? (window.innerWidth+70-(cx-rad)) : (cx+rad+70);
+  return Math.max(520, px)*k;
+}
+/* станина вздрагивает, когда колесо возвращается на ось */
+function shakeMount(){
+  const m=document.querySelector('#mount');
+  if(!m) return;
+  m.classList.remove('shake'); void m.getBoundingClientRect(); m.classList.add('shake');
+}
 
 function pickWinner(){
   let i=Math.floor(Math.random()*SECTORS);
@@ -395,68 +417,151 @@ function pickWinner(){
 }
 function spin(){
   if(spinning) return;
+  state.spins=(state.spins||0)+1; save();
+  const escape=(state.spins%ESCAPE_EVERY===0) && !reducedMotion();
   const i=pickWinner();
   const jitter=(Math.random()*2-1)*11;              /* стрелка встаёт внутрь сектора */
-  const base=-(i*TAU+TAU/2)-jitter;
-  const target=((base%360)+360)%360;
-  const cur=((rot%360)+360)%360;
-  let delta=target-cur; if(delta<0) delta+=360;
+  const target=(((-(i*TAU+TAU/2)-jitter)%360)+360)%360;
   const turns=SPIN.turns+Math.floor(Math.random()*(SPIN.extra+1));
-  const from=rot, to=rot+delta+turns*360;
+  const from=rot;
+  let delta=target-((((rot%360)+360)%360)); if(delta<0) delta+=360;
+  const toFull=from+delta+turns*360;
   const dur=reducedMotion()? 500 : SPIN.dur+Math.random()*SPIN.tail;
+  const WIND=reducedMotion()? 0 : 230;              /* взвод: колесо качается назад */
+  const BACK=5.5;
+  const rotor=$('#rotor'), disc=$('#disc'), halo=$('#halo'), wf=$('#wheel-frame');
 
   spinning=true;
   $('#spin').classList.add('busy');
   $('#wheel-tap').classList.add('busy');
-  $('#wheel-frame').classList.add('spin');
+  wf.classList.add('spin');
+  if(escape) wf.classList.add('rolling');
   highlight(-1);
   resetCard();
-  const t0=performance.now();
-  const WIND=reducedMotion()? 0 : 230;          /* взвод: колесо качается назад */
-  const BACK=5.5;
-  const start=from-BACK;
-  let prevSlot=Math.round(((from%360)+360)%360/TAU), prevRot=from, prevT=t0;
-  const rotor=$('#rotor');
 
-  function frame(now){
-    const el=now-t0;
-    if(el<WIND){
-      const p=Math.sin((el/WIND)*Math.PI/2);
-      rot=from-BACK*p;
-      rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
-      pawlAngle=7*p; setPawl(pawlAngle);
-      prevRot=rot; prevT=now;
-      requestAnimationFrame(frame);
-      return;
-    }
-    const p=Math.min(1,(el-WIND)/dur);
-    rot=start+(to-start)*heavyEase(p);
-    rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
+  const setDisc=(x,y)=>{
+    const t=`translate(${x.toFixed(2)}px, ${(y||0).toFixed(2)}px)`;
+    if(disc) disc.style.transform=t;
+    if(halo) halo.style.transform=t;             /* свечение катится вместе с колесом */
+  };
+  const decayPawl=()=>{ pawlAngle+=(0-pawlAngle)*0.22; setPawl(pawlAngle); };
 
-    const dt=Math.max(1, now-prevT);
-    const v=(rot-prevRot)/dt;                       /* градусов за миллисекунду */
-    prevRot=rot; prevT=now;
-    if(!reducedMotion()){ rotor.style.filter = v>0.18 ? `blur(${clamp(v*4,0,3).toFixed(2)}px)` : ''; }
-
-    /* чем быстрее крутится, тем жарче: свечение и полосы по ободу */
-    if(!reducedMotion()) setGlow(v);
-
-    /* защёлку подбрасывает каждый штырёк, от удара летят искры */
-    const slot=Math.round(((rot%360)+360)%360/TAU);
-    if(slot!==prevSlot){
-      pawlAngle=Math.min(11, 4+v*14);
-      if(!reducedMotion() && v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
-      prevSlot=slot;
-    }
-    pawlAngle+=(0-pawlAngle)*Math.min(1, dt/70);
-    setPawl(pawlAngle);
-
-    if(p<1) requestAnimationFrame(frame); else settle(i);
+  function phase(ms, onFrame, onDone){
+    const t0=performance.now();
+    (function f(now){
+      const p=Math.min(1,(now-t0)/ms);
+      onFrame(p);
+      if(p<1) requestAnimationFrame(f); else onDone();
+    })(performance.now());
   }
-  requestAnimationFrame(frame);
+  /* ближайший угол, на котором нужный сектор встанет на стрелку */
+  function nextTarget(minAngle, extraTurns){
+    return minAngle + ((((target-(((minAngle%360)+360)%360))%360)+360)%360) + extraTurns*360;
+  }
+
+  /* обычный разгон и торможение: свечение, полосы по ободу, щелчки и искры */
+  function run(fromA, toA, durA, done){
+    const t0=performance.now();
+    let prevRot=fromA, prevT=t0, prevSlot=Math.round((((fromA%360)+360)%360)/TAU);
+    (function f(now){
+      const p=Math.min(1,(now-t0)/durA);
+      rot=fromA+(toA-fromA)*heavyEase(p);
+      rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
+      const dt=Math.max(1, now-prevT);
+      const v=(rot-prevRot)/dt;                     /* градусов за миллисекунду */
+      prevRot=rot; prevT=now;
+      if(!reducedMotion()){
+        rotor.style.filter = v>0.18 ? `blur(${clamp(v*4,0,3).toFixed(2)}px)` : '';
+        setGlow(v);
+      }
+      const slot=Math.round((((rot%360)+360)%360)/TAU);
+      if(slot!==prevSlot){
+        pawlAngle=Math.min(11, 4+v*14);
+        if(!reducedMotion() && v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
+        prevSlot=slot;
+      }
+      pawlAngle+=(0-pawlAngle)*Math.min(1, dt/70);
+      setPawl(pawlAngle);
+      if(p<1) requestAnimationFrame(f); else done();
+    })(performance.now());
+  }
+
+  /* взвод перед пуском */
+  function wind(done){
+    if(!WIND) return done();
+    phase(WIND, (p)=>{
+      const e=Math.sin(p*Math.PI/2);
+      rot=from-BACK*e;
+      rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
+      pawlAngle=7*e; setPawl(pawlAngle);
+    }, done);
+  }
+
+  /* --- побег колеса: срыв, качение вправо, возврат слева, прыжок на ось --- */
+  function roll(x, prevX){
+    const dx=x-prevX;
+    rot+=dx*ROLL_K;                                 /* качение без проскальзывания */
+    rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
+    if(!reducedMotion()) setGlow(clamp(Math.abs(dx)*ROLL_K*5, 0, V_REF));
+    return x;
+  }
+  function escapeRun(done){
+    const right=offscreenShift(1), left=-offscreenShift(-1);
+    let prevX=0;
+    /* срыв с оси: подскок, молоточок отлетает, сыплются искры */
+    phase(220, (p)=>{
+      const e=Math.sin(p*Math.PI);
+      setDisc(4*e, -18*e);
+      pawlAngle=Math.min(16, 6+10*e); setPawl(pawlAngle);
+      if(!reducedMotion()) sparkBurst(3);
+    }, ()=>{
+      rotor.style.filter='';
+      /* укатывается вправо, подпрыгивая на неровностях */
+      phase(850, (p)=>{
+        const x=right*p*p;
+        setDisc(x, 6*Math.sin(p*Math.PI*2.5));
+        prevX=roll(x, prevX);
+        decayPawl();
+      }, ()=>{
+        /* за экраном — короткая пауза, потом колесо возвращается слева */
+        phase(430, ()=>{}, ()=>{
+          prevX=left; setDisc(left, 0);
+          phase(950, (p)=>{
+            const e=1-Math.pow(1-p, 2.1);
+            const x=left*(1-e);
+            setDisc(x, 5*Math.sin(p*Math.PI*2.5));
+            prevX=roll(x, prevX);
+            decayPawl();
+          }, ()=> landingOnAxle(done));
+        });
+      });
+    });
+  }
+  /* приземление: подскок, два удара об ось, звяканье защёлки */
+  function landingOnAxle(done){
+    let hits=0;
+    phase(760, (p)=>{
+      let y;
+      if(p<0.34)      y=-34*Math.sin((p/0.34)*Math.PI/2);            /* подскок */
+      else if(p<0.62) y=-34*Math.cos(((p-0.34)/0.28)*Math.PI/2);     /* падение */
+      else            y=-11*Math.sin(((p-0.62)/0.38)*Math.PI)*Math.exp(-2.2*(p-0.62));
+      setDisc(0, y);
+      const touch=(p>=0.62 && hits===0) || (p>=0.97 && hits===1);
+      if(touch){
+        hits++;
+        pawlAngle=13; setPawl(pawlAngle);
+        if(!reducedMotion()){ sparkBurst(4); shakeMount(); }
+      }
+      decayPawl();
+    }, ()=>{
+      setDisc(0, 0);
+      /* и как ни в чём не бывало доращивает вращение до нужного сектора */
+      run(rot, nextTarget(rot+720, 1+Math.floor(Math.random()*2)), dur*0.42, done);
+    });
+  }
 
   /* финальное «докачивание» тяжёлого колеса */
-  function settle(i){
+  function settle(){
     const t0s=performance.now(), durS=reducedMotion()? 0 : SPIN.wob;
     function s(now){
       const p=Math.min(1,(now-t0s)/durS);
@@ -465,12 +570,13 @@ function spin(){
       pawlAngle=Math.sin(p*Math.PI*3)*(1-p)*4;
       setPawl(pawlAngle);
       setGlow(V_REF*0.3*(1-p));
-      if(p<1) requestAnimationFrame(s); else land(i);
+      if(p<1) requestAnimationFrame(s); else land();
     }
-    if(durS===0) land(i); else requestAnimationFrame(s);
+    if(durS===0) land(); else requestAnimationFrame(s);
   }
-  function land(i){
+  function land(){
     rotor.style.filter='';
+    setDisc(0, 0);
     $('#rotor').setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
     setPawl(0);
     setGlow(0);
@@ -478,12 +584,16 @@ function spin(){
     spinning=false;
     $('#spin').classList.remove('busy');
     $('#wheel-tap').classList.remove('busy');
-    $('#wheel-frame').classList.remove('spin');
-    const wf=$('#wheel-frame');
+    wf.classList.remove('spin');
+    wf.classList.remove('rolling');
     wf.classList.remove('hit'); void wf.offsetWidth; wf.classList.add('hit');
     highlight(i);
     showWord(i);
   }
+  const finish=()=> settle();
+
+  wind(()=> run(from-BACK, (escape? from+(toFull-from)*0.5 : toFull), (escape? dur*0.55 : dur),
+    ()=> escape? escapeRun(finish) : finish()));
 }
 
 /* ------------------------------ результат ------------------------------ */
