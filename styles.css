@@ -71,13 +71,21 @@ html[data-theme=light] .wheel-frame{filter:drop-shadow(0 18px 26px rgba(70,50,25
 
 /* лицо колеса */
 .sector{stroke:rgba(16,10,4,.55); stroke-width:1.5}
-.sector.win{stroke:var(--brass); stroke-width:4; filter:drop-shadow(0 0 10px rgba(201,163,92,.55)) brightness(1.12)}
+.sector.win{stroke:var(--brass); stroke-width:4; filter:drop-shadow(0 0 10px rgba(201,163,92,.55)) brightness(1.12);
+  animation:winGlow 2.8s ease-in-out infinite}
+@keyframes winGlow{0%,100%{stroke-width:3.4; filter:brightness(1.06) drop-shadow(0 0 6px rgba(201,163,92,.4))}
+  50%{stroke-width:5; filter:brightness(1.2) drop-shadow(0 0 16px rgba(201,163,92,.7))}}
 .plate{fill:#f2e9d6; stroke:rgba(28,20,10,.55); stroke-width:1.4}
 .plate-txt{fill:#241b10; font-weight:700; letter-spacing:.7px; text-anchor:middle; font-family:var(--font)}
 .plate.hot{fill:#fff8e6; stroke:var(--brass-deep); stroke-width:2.2; filter:drop-shadow(0 0 8px rgba(201,163,92,.6))}
+/* римские номера секторов — гравировка по латуни */
+.roman{fill:#dcb877; stroke:rgba(12,8,3,.55); stroke-width:.55px; paint-order:stroke; letter-spacing:1.2px;
+  font-weight:700; font-family:var(--serif); opacity:.9}
 .sheen{opacity:.9}
 .mount-txt{fill:var(--brass); font-size:11px; letter-spacing:3px; font-weight:700; font-family:var(--font)}
-#pawl{transform-box:view-box; transform-origin:200px 10px; will-change:transform}
+#pawl{transform-box:view-box; transform-origin:200px 10px; will-change:transform; transition:transform .2s ease-out}
+.wheel-frame.spin #pawl{transition:none}
+.wheel-frame:not(.spin):hover #pawl{transform:rotate(-6deg)}
 #rotor{will-change:transform}
 
 /* --------------------------- кнопки --------------------------- */
@@ -95,6 +103,7 @@ html[data-theme=light] .wheel-frame{filter:drop-shadow(0 18px 26px rgba(70,50,25
 .btn.ghost:hover{color:var(--ink)}
 .btn.small{padding:.5rem .9rem; font-size:.9rem; min-height:44px}
 .btn.busy{opacity:.55; pointer-events:none}
+.btn:disabled{opacity:.4; pointer-events:none; box-shadow:none; filter:saturate(.55)}
 
 /* --------------------------- карточка со словом --------------------------- */
 .result{display:flex; justify-content:center}
@@ -113,15 +122,12 @@ html[data-theme=light] .wheel-frame{filter:drop-shadow(0 18px 26px rgba(70,50,25
 
 /* --------------------------- списки --------------------------- */
 h2{font-family:var(--serif); font-size:1.2rem; margin:0 0 10px; letter-spacing:.3px}
-.found-list, .how{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 18px; box-shadow:var(--shadow-soft)}
+.found-list{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 18px; box-shadow:var(--shadow-soft)}
 .chips{display:flex; gap:8px; flex-wrap:wrap}
 .fchip{border:1.5px solid var(--ok-line); background:var(--ok-bg); border-radius:999px; padding:.35rem .75rem;
   font-size:.92rem; font-weight:600}
 .fchip small{color:var(--muted); font-weight:400}
 .empty-note{color:var(--muted); font-size:.94rem}
-.steps{margin:0; padding-left:20px; font-size:.96rem; line-height:1.65}
-.steps li{margin-bottom:6px}
-.hint-text{color:var(--muted); font-size:.9rem; line-height:1.5; margin:12px 0 0}
 .panel-btns{margin-top:12px}
 
 /* --------------------------- доступность --------------------------- */
@@ -144,14 +150,13 @@ h2{font-family:var(--serif); font-size:1.2rem; margin:0 0 10px; letter-spacing:.
   main{grid-template-columns:minmax(0,1fr) 400px; align-items:start}
   .wheel-zone{grid-column:1; grid-row:1}
   .result{grid-column:2; grid-row:1}
-  .found-list{grid-column:1; grid-row:2}
-  .how{grid-column:2; grid-row:2}
+  .found-list{grid-column:1/-1; grid-row:2}
 }
 /* --------------------------- альбомная ориентация телефона --------------------------- */
 @media (max-width:859px) and (orientation:landscape){
   main{grid-template-columns:minmax(0,1fr) minmax(220px,330px); align-items:start}
   .wheel-zone{grid-column:1}
   .result{grid-column:2}
-  .found-list, .how{grid-column:1/-1}
+  .found-list{grid-column:1/-1}
   .wheel-frame{width:min(56vh, 430px)}
 }
