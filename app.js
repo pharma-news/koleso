@@ -448,12 +448,10 @@ function allExplained(){
   $('#word-card').classList.add('hot');
   $('#found').disabled=true;
   $('#spin').disabled=true;
-  $('#again').disabled=true;
 }
 function updateSpinState(){
   const left=available().length;
   $('#spin').disabled = left===0;
-  $('#again').disabled = left===0;
   return left;
 }
 function spin(){
@@ -710,7 +708,6 @@ function toggleTheme(){
 /* ------------------------------ кнопки и клавиатура ------------------------------ */
 $('#spin').addEventListener('click',spin);
 $('#wheel-tap').addEventListener('click',spin);
-$('#again').addEventListener('click',spin);
 $('#found').addEventListener('click',markFound);
 $('#clear-found').addEventListener('click',()=>{
   if(!state.found.length) return;
