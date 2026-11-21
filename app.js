@@ -404,7 +404,7 @@ function heavyEase(p){
   return PROFILE[i]+(PROFILE[j]-PROFILE[i])*f;
 }
 const SPIN={ turns:7, extra:3, dur:7600, tail:2600, wob:900 };
-const ESCAPE_EVERY=10;                            /* каждое 10-е вращение колесо срывается и укатывается */
+const ESCAPE_EVERY=5;                             /* каждое 5-е вращение колесо срывается и укатывается */
 const ROLL_K=180/(Math.PI*(BAND_R+BAND_W/2));     /* градусов поворота на единицу пути: качение без проскальзывания */
 const FLOOR_Y=436;                                /* пол: низ основания станины */
 const FLOOR_DROP=FLOOR_Y-(BAND_R+BAND_W/2)-CY;    /* на сколько колесо опустится, встав на пол (51) */
