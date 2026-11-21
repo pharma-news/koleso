@@ -11,8 +11,8 @@ const CX=200, CY=196;              /* центр колеса в единица�
 const R=160;                       /* радиус лица колеса (секторов) */
 const BAND_R=176, BAND_W=26;       /* деревянный обод */
 const PIN_R=166;                   /* штырьки, о которые стучит защёлка */
-const PLATE_R=138;                 /* плашки со словами */
-const ROMAN_R=80;                  /* римские номера секторов */
+const PLATE_OUT=156, PLATE_IN=72, PLATE_H=26; /* плашки: вдоль радиуса, читаются вниз к центру */
+const ROMAN_R=60;                  /* римские номера секторов */
 const PIVOT_X=200, PIVOT_Y=10;     /* ось защёлки-молоточка */
 const KEY='koleso_v1';
 const SVGNS='http://www.w3.org/2000/svg';
@@ -56,14 +56,14 @@ function accentOf(i){
   const [h,s,l]=PALETTE[i%PALETTE.length];
   return `hsl(${h} ${clamp(s+22,20,80)}% ${clamp(l+26,30,72)}%)`;
 }
-/* плашка не должна залезать на соседнюю: ширина ограничена хордой сектора */
-const MAX_PLATE_W = 2*PLATE_R*Math.sin(Math.PI/SECTORS) - 4;
+/* плашка лежит вдоль радиуса: длина ограничена span между кольцом и ободом */
+const PLATE_SPAN = PLATE_OUT - PLATE_IN;
 function labelSize(w){
-  const base = w.length<=5 ? 16 : w.length<=6 ? 14.5 : w.length<=7 ? 13 : 12;
-  const fit = ((MAX_PLATE_W-14)/w.length - 0.5)/0.63;
+  const base = w.length<=5 ? 19 : w.length<=6 ? 17.5 : w.length<=7 ? 16 : 15;
+  const fit = ((PLATE_SPAN-16)/w.length - 0.7)/0.62;
   return Math.round(Math.min(base, fit)*10)/10;
 }
-function plateWidth(txt, size){ return Math.min(MAX_PLATE_W, txt.length*(size*0.63+0.5)+14); }
+function plateLen(txt, size){ return Math.min(PLATE_SPAN, txt.length*(size*0.62+0.7)+16); }
 function labelText(w){ return w.length>11 ? w.slice(0,10)+'…' : w; }
 
 /* ------------------------------ сборка колеса ------------------------------ */
@@ -177,7 +177,7 @@ function buildWheel(){
   /* грани секторов и штырьки, о которые стучит защёлка */
   for(let i=0;i<SECTORS;i++){
     const a=(i*TAU-90)*Math.PI/180;
-    const x0=CX+56*Math.cos(a), y0=CY+56*Math.sin(a), x1=CX+R*Math.cos(a), y1=CY+R*Math.sin(a);
+    const x0=CX+68*Math.cos(a), y0=CY+68*Math.sin(a), x1=CX+R*Math.cos(a), y1=CY+R*Math.sin(a);
     rotor.appendChild(svgEl('line',{x1:x0.toFixed(2),y1:y0.toFixed(2),x2:x1.toFixed(2),y2:y1.toFixed(2),
       stroke:'rgba(14,9,4,.45)','stroke-width':'1.6'}));
     const px=CX+PIN_R*Math.cos(a), py=CY+PIN_R*Math.sin(a);
@@ -186,7 +186,7 @@ function buildWheel(){
   }
 
   /* гравированный циферблат: два латунных кольца и римские номера секторов */
-  for(const rr of [56,104]){
+  for(const rr of [48,68]){
     rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:rr,fill:'none',stroke:'rgba(10,6,2,.45)','stroke-width':'2.4'}));
     rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:rr+2,fill:'none',stroke:'rgba(222,186,116,.42)','stroke-width':'1.2'}));
   }
@@ -202,41 +202,42 @@ function buildWheel(){
     rotor.appendChild(outer);
   }
 
-  /* плашки со словами: по касательной, нижние перевёрнуты, чтобы читались */
+  /* плашки со словами: все как одна повёрнуты вниз к центру,
+     читаются вдоль радиуса — от обода к середине сектора */
   for(let i=0;i<SECTORS;i++){
     const txt=labelText(words[i]), size=labelSize(txt);
-    const w=plateWidth(txt, size), h=26;
+    const len=plateLen(txt, size), mid=(PLATE_OUT+PLATE_IN)/2;
+    const y0=CY-mid-len/2, cy=CY-mid;
     const phi=i*TAU+TAU/2;
-    const outer=svgEl('g',{transform:`rotate(${phi} ${CX} ${CY})`,'data-i':i});
-    const inner=svgEl('g',{});
-    if(phi>90 && phi<270){ inner.setAttribute('transform',`rotate(180 ${CX} ${CY-PLATE_R})`); }
-    inner.appendChild(svgEl('rect',{class:'plate','data-i':i, x:(CX-w/2).toFixed(2), y:(CY-PLATE_R-h/2).toFixed(2),
-      width:w.toFixed(2), height:h, rx:'6', ry:'6'}));
-    const t=svgEl('text',{class:'plate-txt', x:CX, y:(CY-PLATE_R+5).toFixed(2), 'font-size':size});
+    const g=svgEl('g',{transform:`rotate(${phi} ${CX} ${CY})`,'data-i':i});
+    g.appendChild(svgEl('rect',{class:'plate','data-i':i, x:(CX-PLATE_H/2).toFixed(2), y:y0.toFixed(2),
+      width:PLATE_H, height:len.toFixed(2), rx:'9', ry:'9'}));
+    const t=svgEl('text',{class:'plate-txt', x:CX, y:cy.toFixed(2), 'font-size':size,
+      'text-anchor':'middle', 'dominant-baseline':'central',
+      transform:`rotate(90 ${CX} ${cy.toFixed(2)})`});
     t.textContent=txt.toUpperCase();
-    inner.appendChild(t);
-    outer.appendChild(inner);
-    rotor.appendChild(outer);
+    g.appendChild(t);
+    rotor.appendChild(g);
   }
 
   /* ступица: деревянный диск с болтами, крутится вместе с колесом */
   rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R,fill:'none',stroke:'rgba(10,6,2,.5)','stroke-width':'4'}));
-  rotor.appendChild(svgEl('circle',{class:'hub',cx:CX,cy:CY,r:'52',fill:'url(#hubWood)',stroke:'url(#brass)','stroke-width':'5'}));
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'52',fill:'#e9c98c',filter:'url(#grainHub)',opacity:'.42'}));
+  rotor.appendChild(svgEl('circle',{class:'hub',cx:CX,cy:CY,r:'44',fill:'url(#hubWood)',stroke:'url(#brass)','stroke-width':'5'}));
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'44',fill:'#e9c98c',filter:'url(#grainHub)',opacity:'.42'}));
   /* розетка: 12 латунных лучей, как у настоящей машинки */
   for(let i=0;i<12;i++){
     const a=(i*30-90)*Math.PI/180, am=(i*30-90+15)*Math.PI/180;
-    const rOut=(i%2===0)?46:33;
+    const rOut=(i%2===0)?38:27;
     const p1=[CX+rOut*Math.cos(a), CY+rOut*Math.sin(a)];
-    const p2=[CX+24*Math.cos(am), CY+24*Math.sin(am)];
+    const p2=[CX+20*Math.cos(am), CY+20*Math.sin(am)];
     rotor.appendChild(svgEl('path',{d:`M ${CX} ${CY} L ${p1[0].toFixed(2)} ${p1[1].toFixed(2)} L ${p2[0].toFixed(2)} ${p2[1].toFixed(2)} Z`,
       fill:'rgba(222,186,116,.30)'}));
   }
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'46',fill:'none',stroke:'rgba(222,186,116,.5)','stroke-width':'1.2'}));
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'24',fill:'none',stroke:'rgba(222,186,116,.4)','stroke-width':'1'}));
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'38',fill:'none',stroke:'rgba(222,186,116,.5)','stroke-width':'1.2'}));
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'20',fill:'none',stroke:'rgba(222,186,116,.4)','stroke-width':'1'}));
   for(let i=0;i<6;i++){
     const a=(i*60-90)*Math.PI/180;
-    const x=CX+40*Math.cos(a), y=CY+40*Math.sin(a);
+    const x=CX+33*Math.cos(a), y=CY+33*Math.sin(a);
     rotor.appendChild(svgEl('circle',{cx:x.toFixed(2),cy:y.toFixed(2),r:'3.6',fill:'url(#brassR)',stroke:'rgba(16,10,4,.7)','stroke-width':'.9'}));
   }
   svg.appendChild(rotor);
@@ -395,7 +396,7 @@ function spin(){
 /* ------------------------------ результат ------------------------------ */
 function resetCard(){
   $('#word').textContent='—';
-  $('#task').textContent='Найди это слово в словаре или энциклопедии на столе и скажи, что оно обозначает.';
+  $('#task').textContent='Найдите это слово в словаре или энциклопедии на столе и скажите, что оно обозначает.';
   $('#word-card').classList.remove('hot');
   $('#found').disabled=true;
 }
@@ -406,7 +407,7 @@ function showWord(i){
   const card=$('#word-card');
   card.style.setProperty('--accent', accentOf(i));
   card.classList.add('hot');
-  $('#task').textContent='Найди слово «'+w+'» в словаре или энциклопедии на столе и расскажи, что оно обозначает.';
+  $('#task').textContent='Найдите слово «'+w+'» в словаре или энциклопедии на столе и расскажите, что оно обозначает.';
   $('#found').disabled=alreadyFound(w);
   card.classList.remove('hit'); void card.offsetWidth; card.classList.add('hit');
   card.scrollIntoView({behavior:reducedMotion()?'auto':'smooth', block:'nearest'});
