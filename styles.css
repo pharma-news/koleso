@@ -42,9 +42,80 @@ html[data-theme=light] body{
 }
 main{max-width:1060px; margin:0 auto; padding:16px 14px; display:grid; gap:18px}
 
+/* --------------------------- живой фон ---------------------------
+   Тёплый свет лампы, который медленно дышит и усиливается, когда колесо
+   крутится; пылинки в луче; свет слегка гуляет по комнате; плёночное зерно.
+   Всё под контентом, на клик не реагирует. */
+.ambient{position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;
+  transform:translate3d(var(--ax,0px), var(--ay,0px), 0); transition:transform .5s ease-out}
+.amb{position:absolute; inset:-12%}
+main,header{position:relative; z-index:1}
+
+.amb-lamp{
+  background:
+    radial-gradient(42% 34% at 50% 32%, rgba(255,216,146,.17), rgba(255,190,110,.06) 46%, transparent 74%),
+    radial-gradient(70% 46% at 50% 24%, rgba(255,232,186,.07), transparent 70%);
+  animation:lampBreathe 15s ease-in-out infinite;
+  transition:filter .6s ease;
+}
+@keyframes lampBreathe{0%,100%{opacity:.82; transform:scale(1)} 50%{opacity:1; transform:scale(1.06)}}
+body.lit .amb-lamp{filter:brightness(1.55) saturate(1.06)}
+/* мягкий конус света, который медленно качается, как качнувшаяся лампа */
+.amb-lamp::after{content:''; position:absolute; left:-8%; top:-12%; width:58%; height:124%;
+  background:linear-gradient(102deg, rgba(255,222,160,.10), rgba(255,222,160,0) 58%);
+  animation:beamSway 26s ease-in-out infinite alternate}
+@keyframes beamSway{0%{opacity:.7; transform:translate3d(-2%,0,0) rotate(-4deg)}
+  100%{opacity:1; transform:translate3d(7%,1%,0) rotate(2deg)}}
+
+.amb-drift{
+  background:
+    radial-gradient(34% 30% at 18% 26%, rgba(255,230,186,.09), transparent 66%),
+    radial-gradient(30% 26% at 84% 72%, rgba(150,112,64,.13), transparent 66%);
+  animation:ambDrift 54s ease-in-out infinite alternate;
+}
+@keyframes ambDrift{0%{transform:translate3d(-4%,-2%,0) scale(1.06)} 100%{transform:translate3d(5%,3%,0) scale(1.14)}}
+
+.mote{position:absolute; border-radius:50%; background:rgba(255,228,174,.85);
+  box-shadow:0 0 7px rgba(255,204,124,.45); opacity:0;
+  animation:moteFloat var(--d,26s) linear infinite}
+@keyframes moteFloat{
+  0%{opacity:0; transform:translate3d(0,0,0)}
+  12%{opacity:var(--o,.4)} 82%{opacity:var(--o,.4)}
+  100%{opacity:0; transform:translate3d(var(--dx,20px), var(--dy,-180px),0)}
+}
+
+.amb-grain{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:.055; mix-blend-mode:overlay;
+}
+
+html[data-theme=light] .amb-lamp{
+  background:
+    radial-gradient(46% 36% at 50% 28%, rgba(255,214,140,.42), rgba(255,226,178,.14) 48%, transparent 76%),
+    radial-gradient(80% 50% at 50% 18%, rgba(255,246,222,.5), transparent 72%);
+}
+html[data-theme=light] .amb-drift{
+  background:
+    radial-gradient(34% 30% at 16% 22%, rgba(255,238,206,.75), transparent 66%),
+    radial-gradient(32% 28% at 86% 76%, rgba(214,186,136,.4), transparent 66%);
+}
+html[data-theme=light] .mote{background:rgba(150,116,62,.65); box-shadow:0 0 6px rgba(190,158,96,.35)}
+html[data-theme=light] .amb-grain{opacity:.05; mix-blend-mode:multiply}
+html[data-theme=light] .amb-lamp::after{background:linear-gradient(102deg, rgba(255,246,220,.72), rgba(255,246,220,0) 60%)}
+@media (prefers-reduced-motion: reduce){
+  .amb-lamp,.amb-drift,.amb-lamp::after,.mote{animation:none}
+  .ambient{transition:none}
+  .mote{opacity:.3}
+}
+
 /* --------------------------- шапка --------------------------- */
 .topbar{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
   padding:12px 16px; border-bottom:1px solid var(--line); background:var(--bg-2)}
+/* шапка полупрозрачная: свет за ней слегка ходит; если color-mix не поддерживается,
+   остаётся плотный фон выше */
+@supports (background:color-mix(in srgb, red 50%, transparent)){
+  .topbar{background:color-mix(in srgb, var(--bg-2) 84%, transparent); backdrop-filter:blur(5px)}
+}
 .brand{display:flex; align-items:center; gap:11px}
 .brand .logo{font-size:1.6rem}
 .brand-text b{display:block; font-family:var(--serif); font-size:1.2rem; letter-spacing:.6px}

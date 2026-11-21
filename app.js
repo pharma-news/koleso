@@ -472,6 +472,7 @@ function spin(){
   const rotor=$('#rotor'), disc=$('#disc'), halo=$('#halo'), rollShadow=$('#rollShadow'), wf=$('#wheel-frame');
 
   spinning=true;
+  document.body.classList.add('lit');          /* свет в комнате крепчает, когда колесо ходит */
   $('#spin').classList.add('busy');
   $('#wheel-tap').classList.add('busy');
   wf.classList.add('spin');
@@ -639,6 +640,7 @@ function spin(){
     $('#wheel-tap').classList.remove('busy');
     wf.classList.remove('spin');
     wf.classList.remove('rolling');
+    document.body.classList.remove('lit');
     wf.classList.remove('hit'); void wf.offsetWidth; wf.classList.add('hit');
     highlight(i);
     showWord(i);
@@ -691,6 +693,47 @@ function alreadyFound(w){
   return state.found.some(f=>String(f.w).toLowerCase()===key);
 }
 
+/* ------------------------------ живой фон ------------------------------ */
+/* пылинки в луче света: их количество зависит от ширины экрана */
+function initAmbient(){
+  const box=$('#amb-motes');
+  if(!box) return;
+  box.innerHTML='';
+  if(reducedMotion()) return;
+  const n=Math.max(14, Math.min(30, Math.round(window.innerWidth/44)));
+  const frag=document.createDocumentFragment();
+  for(let k=0;k<n;k++){
+    const m=document.createElement('span');
+    m.className='mote';
+    const size=(1.8+Math.random()*2.4).toFixed(1);
+    m.style.cssText =
+      'left:'+(Math.random()*100).toFixed(2)+'%;top:'+(18+Math.random()*86).toFixed(2)+'%;'+
+      'width:'+size+'px;height:'+size+'px;'+
+      '--d:'+(17+Math.random()*25).toFixed(1)+'s;'+
+      '--o:'+(0.22+Math.random()*0.45).toFixed(2)+';'+
+      '--dx:'+(Math.random()*90-45).toFixed(0)+'px;'+
+      '--dy:'+(-120-Math.random()*260).toFixed(0)+'px;'+
+      'animation-delay:'+(-Math.random()*42).toFixed(1)+'s';
+    frag.appendChild(m);
+  }
+  box.appendChild(frag);
+}
+/* фон чуть смещается за курсором — получается глубина */
+let ambPending=false, ambX=0, ambY=0;
+function ambShift(){
+  ambPending=false;
+  const amb=$('.ambient');
+  if(!amb) return;
+  amb.style.setProperty('--ax',(ambX*-13).toFixed(1)+'px');
+  amb.style.setProperty('--ay',(ambY*-9).toFixed(1)+'px');
+}
+window.addEventListener('pointermove',e=>{
+  if(reducedMotion() || e.pointerType!=='mouse') return;
+  ambX=e.clientX/Math.max(1,window.innerWidth)-0.5;
+  ambY=e.clientY/Math.max(1,window.innerHeight)-0.5;
+  if(!ambPending){ ambPending=true; requestAnimationFrame(ambShift); }
+},{passive:true});
+
 /* ------------------------------ тема ------------------------------ */
 function applyTheme(){
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -734,6 +777,7 @@ window.addEventListener('resize',()=>{
 /* колесо стоит «как после последнего вращения»: стрелка по центру сектора */
 rot=-(Math.floor(Math.random()*SECTORS)*TAU + TAU/2);
 applyTheme();
+initAmbient();
 renderFound();
 resetCard();
 updateSpinState();
