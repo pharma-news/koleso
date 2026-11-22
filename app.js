@@ -103,6 +103,12 @@ function buildDish(){
     .forEach(s=>goldR.appendChild(s));
   defs.appendChild(goldR);
 
+  /* светлая пластина таблички с названием: на тёмном дереве буквы должны читаться */
+  const plateG=svgEl('linearGradient',{id:'plateG',x1:'0.2',y1:'0',x2:'0.6',y2:'1'});
+  stops([['0%','#fdf5e2'],['40%','#f0e1bd'],['72%','#ddc79c'],['100%','#c6ac80']])
+    .forEach(s=>plateG.appendChild(s));
+  defs.appendChild(plateG);
+
   /* фарфор: светлый сверху-слева, тёплая тень снизу-справа; дно почти плоское */
   const porc=svgEl('radialGradient',{id:'porc',cx:'32%',cy:'24%',r:'86%'});
   stops([['0%','#fffefc'],['30%','#fdfbf5'],['58%','#f8f3e9'],['80%','#eee6d9'],['100%','#ddd3c0']])
@@ -195,7 +201,18 @@ function buildDish(){
   standBack.appendChild(svgEl('rect',{x:'82',y:'410',width:'236',height:'26',rx:'7',fill:'url(#wood)',stroke:'#150d05','stroke-width':'2'}));
   standBack.appendChild(svgEl('rect',{x:'82',y:'410',width:'236',height:'5',rx:'2',fill:'rgba(255,226,170,.14)'}));
   standBack.appendChild(svgEl('rect',{x:'82',y:'410',width:'236',height:'26',rx:'7',fill:'#e9c98c',filter:'url(#grainWood)',opacity:'.38'}));
-  const nameTxt=svgEl('text',{class:'mount-txt',x:CX,y:'428','text-anchor':'middle'});
+  /* табличка с названием: светлая отполированная пластина на тёмном дереве,
+     буквы тёмные и с мягкой подсветкой снизу — как выдавленные */
+  standBack.appendChild(svgEl('rect',{x:'104',y:'416',width:'192',height:'20',rx:'5',fill:'rgba(10,6,2,.55)',
+    filter:'url(#softShadow)','pointer-events':'none'}));
+  standBack.appendChild(svgEl('rect',{x:'104',y:'413',width:'192',height:'20',rx:'5',fill:'url(#plateG)',
+    stroke:'rgba(28,18,6,.7)','stroke-width':'1.3'}));
+  standBack.appendChild(svgEl('rect',{x:'107',y:'416',width:'186',height:'14',rx:'3.5',fill:'none',
+    stroke:'rgba(96,68,22,.32)','stroke-width':'.9'}));
+  const nameHi=svgEl('text',{class:'mount-txt-hi',x:CX,y:'429.4','text-anchor':'middle'});
+  nameHi.textContent='ТАРЕЛКА СЛОВ';
+  standBack.appendChild(nameHi);
+  const nameTxt=svgEl('text',{class:'mount-txt',x:CX,y:'428.5','text-anchor':'middle'});
   nameTxt.textContent='ТАРЕЛКА СЛОВ';
   standBack.appendChild(nameTxt);
   for(const bx of [100,300]){

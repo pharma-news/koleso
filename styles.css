@@ -166,7 +166,8 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
   letter-spacing:.5px; font-weight:700; font-family:var(--serif); opacity:.95}
 .sheen{opacity:.9}
 .gloss{opacity:.85}
-.mount-txt{fill:var(--brass); font-size:11px; letter-spacing:3px; font-weight:700; font-family:var(--font)}
+.mount-txt{fill:#2b1c08; font-size:11.5px; letter-spacing:2.8px; font-weight:800; font-family:var(--font)}
+.mount-txt-hi{fill:rgba(255,253,244,.62); font-size:11.5px; letter-spacing:2.8px; font-weight:800; font-family:var(--font)}
 #pawl{transform-box:view-box; transform-origin:200px 6px; will-change:transform; transition:transform .2s ease-out}
 .dish-frame.spin #pawl{transition:none}
 .dish-frame:not(.spin):hover #pawl{transform:rotate(-8deg)}
@@ -189,7 +190,7 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
 .dish-frame.hit #pawl .foot{animation:footFlash .8s ease-out}
 @keyframes footFlash{0%{fill:#fffbe8; filter:drop-shadow(0 0 12px rgba(255,215,130,1))} 100%{filter:drop-shadow(0 0 0 rgba(255,215,130,0))}}
 .dish-frame.spin .mount-txt{animation:nameFlash 1.4s ease-out}
-@keyframes nameFlash{0%{fill:#fff1cd} 100%{fill:var(--brass)}}
+@keyframes nameFlash{0%{fill:#8a6524} 100%{fill:#2b1c08}}
 
 /* --------------------------- кнопки --------------------------- */
 .spin-row{display:flex; flex-direction:column; align-items:center; gap:10px; width:100%}
@@ -201,6 +202,13 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
 .btn.primary{background:linear-gradient(180deg,var(--brass-hi),var(--brass) 45%,var(--brass-deep));
   border-color:var(--brass-deep); color:#20180b; font-weight:800; letter-spacing:.4px;
   box-shadow:0 10px 22px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.5)}
+/* кнопка крутки — тёмно-зелёный лак с кремовой надписью:
+   рядом с золотистой «Нашли и объяснили» их нельзя спутать */
+.btn.crank{background:linear-gradient(180deg,#4d8e6f,#2f6350 46%,#183c2e);
+  border-color:#133024; color:#f8efd6; font-weight:800; letter-spacing:.5px;
+  box-shadow:0 12px 26px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 7px rgba(0,0,0,.3)}
+.btn.crank:hover{border-color:var(--brass); color:#fff8e4;
+  box-shadow:0 16px 30px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.3), inset 0 -2px 7px rgba(0,0,0,.3)}
 .btn.big{font-size:1.15rem; padding:.95rem 1.6rem; width:min(92vw, 380px)}
 .btn.ghost{background:transparent; box-shadow:none; color:var(--muted)}
 .btn.ghost:hover{color:var(--ink)}
@@ -243,7 +251,7 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
   main{grid-template-columns:minmax(0,1fr) 400px; align-items:start}
   .dish-zone{grid-column:1; grid-row:1}
   .result{grid-column:2; grid-row:1}
-  .spin-row{order:2}
+  .spin-row{order:2; margin-top:26px}
   .dish-frame{width:min(620px, calc(100vw - 470px))}
 }
 /* --------------------------- альбомная ориентация телефона --------------------------- */
