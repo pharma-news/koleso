@@ -9,13 +9,13 @@
 const WORDS=['Бумага','Арена','Награда','Чемодан','Маскарад','Ураган','Радуга','Мешок','Басня','Лагерь','Договор','Обычай'];
 const SECTORS=WORDS.length, TAU=360/SECTORS;
 const CX=200, CY=196;              /* центр тарелки в единицах viewBox */
-const DISH_R=186;                  /* внешний край тарелки */
-const R=160;                       /* глазурованное поле с секторами */
+const DISH_R=190;                  /* внешний край: большая тарелка занимает почти весь кадр */
+const R=154;                       /* расписное поле, остальное — широкий чистый борт */
 const RIM_MID=(DISH_R+R)/2;        /* середина широкого борта тарелки */
-const DOT_R=176;                   /* золотые точки по борту, о них стучит ложечка */
-const WELL=72;                     /* фарфоровое поле в середине тарелки */
-const TILE_OUT=150, TILE_IN=72, TILE_H=26; /* плашки со словами: вдоль радиуса, читаются вниз к центру */
-const ROMAN_R=60;                  /* римские номера секторов */
+const DOT_R=170;                   /* золотые точки по борту, о них стучит ложечка */
+const WELL=60;                     /* неглубокая фарфоровая пипка в середине тарелки */
+const TILE_OUT=146, TILE_IN=66, TILE_H=26; /* плашки со словами: вдоль радиуса, читаются вниз к центру */
+const ROMAN_R=51;                  /* римские номера секторов */
 const PIVOT_X=200, PIVOT_Y=6;      /* ось ложечки-защёлки */
 const KEY='tarelka_v1', OLD_KEY='koleso_v1';
 const SVGNS='http://www.w3.org/2000/svg';
@@ -90,21 +90,21 @@ function buildDish(){
     .forEach(s=>goldR.appendChild(s));
   defs.appendChild(goldR);
 
-  /* фарфор: светлый сверху-слева, тёплая тень снизу-справа */
+  /* фарфор: светлый сверху-слева, тёплая тень снизу-справа; дно почти плоское */
   const porc=svgEl('radialGradient',{id:'porc',cx:'32%',cy:'24%',r:'86%'});
-  stops([['0%','#fffefb'],['34%','#fdfaf3'],['62%','#f4eee1'],['84%','#e6dccb'],['100%','#cfc3ad']])
+  stops([['0%','#fffefc'],['30%','#fdfbf5'],['58%','#f8f3e9'],['80%','#eee6d9'],['100%','#ddd3c0']])
     .forEach(s=>porc.appendChild(s));
   defs.appendChild(porc);
 
-  /* борт тарелки: он чуть темнее середины и скруглён к краю */
+  /* борт тарелки: прогиб внутрь к полю, плоская полка и тонкий торец у края */
   const rim=svgEl('radialGradient',{id:'rimG',cx:'32%',cy:'24%',r:'86%'});
-  stops([['0%','#fffdf7'],['40%','#f8f3e8'],['70%','#ece3d3'],['100%','#d8ccb8']])
+  stops([['0%','#fffdf8'],['68%','#f7f2e7'],['80%','#e9e0d0'],['88%','#f6f1e6'],['95%','#e3d9c9'],['100%','#cec3ad']])
     .forEach(s=>rim.appendChild(s));
   defs.appendChild(rim);
 
   /* фарфоровое поле в середине тарелки (пипка) */
   const wellG=svgEl('radialGradient',{id:'wellG',cx:'34%',cy:'26%',r:'84%'});
-  stops([['0%','#fffffb'],['46%','#f6f0e2'],['100%','#ded3bd']]).forEach(s=>wellG.appendChild(s));
+  stops([['0%','#fffefb'],['50%','#f9f4e9'],['100%','#e6dcc8']]).forEach(s=>wellG.appendChild(s));
   defs.appendChild(wellG);
 
   const wood=svgEl('linearGradient',{id:'wood',x1:'0.1',y1:'0',x2:'0.7',y2:'1'});
@@ -123,7 +123,7 @@ function buildDish(){
 
   /* неподвижный свет по фарфору: сверху-слева блик, снизу-справа тёплая тень */
   const sheen=svgEl('linearGradient',{id:'sheen',x1:'0.14',y1:'0',x2:'0.72',y2:'1'});
-  stops([['0%','rgba(255,255,255,.46)'],['34%','rgba(255,252,240,.10)'],['66%','rgba(96,74,40,.08)'],['100%','rgba(58,44,22,.20)']])
+  stops([['0%','rgba(255,255,255,.42)'],['30%','rgba(255,252,240,.10)'],['62%','rgba(96,74,40,.05)'],['100%','rgba(58,44,22,.18)']])
     .forEach(s=>sheen.appendChild(s));
   defs.appendChild(sheen);
 
@@ -169,7 +169,7 @@ function buildDish(){
   /* свечение за тарелкой */
   svg.appendChild(svgEl('circle',{id:'halo',cx:CX,cy:CY,r:DISH_R+50,fill:'url(#haloG)',opacity:'0','pointer-events':'none'}));
   /* тень под тарелкой, когда она катится по полу */
-  svg.appendChild(svgEl('ellipse',{id:'rollShadow',cx:CX,cy:FLOOR_Y,rx:'150',ry:'10',
+  svg.appendChild(svgEl('ellipse',{id:'rollShadow',cx:CX,cy:FLOOR_Y,rx:'156',ry:'10',
     fill:'rgba(0,0,0,.45)',filter:'url(#softShadow)',opacity:'0','pointer-events':'none'}));
 
   /* ---- подставка-мольберт: тень на полу, задние ножки, основание с табличкой ---- */
@@ -195,27 +195,30 @@ function buildDish(){
   const rotor=svgEl('g',{id:'rotor'});
   rotor.setAttribute('transform',`rotate(${rot} ${CX} ${CY})`);
 
-  /* фарфоровый корпус: сплошной диск и широкий борт вокруг поля с росписью */
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R,fill:'url(#porc)',stroke:'rgba(70,54,28,.5)','stroke-width':'2'}));
+  /* торец тарелки: сдвинутый вниз круг, снизу из-под фарфора видна толщина */
+  disc.appendChild(svgEl('circle',{cx:CX,cy:(CY+5),r:DISH_R,fill:'#bfb29a',stroke:'rgba(96,78,48,.3)','stroke-width':'1.2','pointer-events':'none'}));
+
+  /* фарфоровый корпус: плоское дно и широкий чистый борт вокруг росписи */
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R,fill:'url(#porc)',stroke:'rgba(96,78,48,.34)','stroke-width':'1.4'}));
   rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:RIM_MID,fill:'none',stroke:'url(#rimG)','stroke-width':(DISH_R-R)}));
   /* редкие крапинки в глазури по бортам */
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R-2,fill:'#7a6a4c','filter':'url(#speck)',opacity:'.16','pointer-events':'none'}));
-  /* переход от поля к бортам: мягкая тень и золотой кант */
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R+4,fill:'none',stroke:'rgba(60,44,20,.18)','stroke-width':'6'}));
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R+10,fill:'none',stroke:'url(#gold)','stroke-width':'2.2'}));
-  /* кант по внешнему краю тарелки и тонкая золотая линия по борту */
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R-4,fill:'none',stroke:'url(#gold)','stroke-width':'3.2'}));
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R-14,fill:'none',stroke:'rgba(172,138,66,.55)','stroke-width':'1.2'}));
-  /* борт освещён сверху и в тени снизу */
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R-3,fill:'none',stroke:'rgba(255,255,250,.26)','stroke-width':'1.8','stroke-dasharray':'150 60 90 40'}));
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R-6,fill:'none',stroke:'rgba(58,42,18,.14)','stroke-width':'1.6','stroke-dasharray':'60 120 40 150'}));
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R-2,fill:'#7a6a4c','filter':'url(#speck)',opacity:'.14','pointer-events':'none'}));
+  /* одно прессованное колечко у самого края: тень и парящий над ней блик */
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:183,fill:'none',stroke:'rgba(92,72,40,.12)','stroke-width':'1.6'}));
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:(CY-1.6),r:183,fill:'none',stroke:'rgba(255,255,250,.38)','stroke-width':'1.1'}));
+  /* прогиб борта внутрь: мягкая тень в углублении у расписного поля и блик на подъёме */
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R+5,fill:'none',stroke:'rgba(60,44,20,.11)','stroke-width':'7'}));
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:(CY-1.8),r:R+9,fill:'none',stroke:'rgba(255,252,240,.34)','stroke-width':'1.5'}));
+  /* тонкая золотая линия вокруг расписного поля и кант по внешнему краю */
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R+13,fill:'none',stroke:'rgba(178,144,72,.5)','stroke-width':'1.2'}));
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R-4,fill:'none',stroke:'url(#gold)','stroke-width':'1.8'}));
 
   /* золотые точки по борту: по ним стучит ложечка */
   for(let i=0;i<24;i++){
     const a=(i*15-90)*Math.PI/180;
     const x=CX+DOT_R*Math.cos(a), y=CY+DOT_R*Math.sin(a);
-    rotor.appendChild(svgEl('circle',{cx:x.toFixed(2),cy:y.toFixed(2),r:'3',fill:'url(#goldR)',stroke:'rgba(96,70,26,.5)','stroke-width':'.8'}));
-    rotor.appendChild(svgEl('circle',{cx:(x-0.9).toFixed(2),cy:(y-1.1).toFixed(2),r:'.9',fill:'rgba(255,252,238,.8)'}));
+    rotor.appendChild(svgEl('circle',{cx:x.toFixed(2),cy:y.toFixed(2),r:'2.2',fill:'url(#goldR)',stroke:'rgba(96,70,26,.4)','stroke-width':'.6'}));
+    rotor.appendChild(svgEl('circle',{cx:(x-0.7).toFixed(2),cy:(y-0.9).toFixed(2),r:'.7',fill:'rgba(255,252,238,.85)'}));
   }
 
   /* блики по глазури: видны только на скорости */
@@ -249,17 +252,16 @@ function buildDish(){
   /* крапинки в глазури поверх секторов */
   rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R-1,fill:'#7a6a4c','filter':'url(#speck)',opacity:'.08','pointer-events':'none'}));
 
-  /* роспись вокруг середины: два золотых колечка и римские номера секторов */
-  for(const rr of [48,68]){
-    rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:rr,fill:'none',stroke:'rgba(84,62,26,.42)','stroke-width':'1.8'}));
-    rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:rr+2,fill:'none',stroke:'rgba(182,146,70,.6)','stroke-width':'1.4'}));
+  /* роспись вокруг середины: два тонких золотых колечка и римские номера секторов */
+  for(const rr of [44,58]){
+    rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:rr,fill:'none',stroke:'rgba(178,144,72,.62)','stroke-width':'1.3'}));
   }
   for(let i=0;i<SECTORS;i++){
     const phi=i*TAU+TAU/2;
     const outer=svgEl('g',{transform:`rotate(${phi} ${CX} ${CY})`});
     const inner=svgEl('g',{});
     if(phi>90 && phi<270){ inner.setAttribute('transform',`rotate(180 ${CX} ${CY-ROMAN_R})`); }
-    const num=svgEl('text',{class:'roman',x:CX,y:(CY-ROMAN_R+3.6).toFixed(2),'font-size':'10','text-anchor':'middle'});
+    const num=svgEl('text',{class:'roman',x:CX,y:(CY-ROMAN_R+3.2).toFixed(2),'font-size':'9','text-anchor':'middle'});
     num.textContent=ROMAN[i];
     inner.appendChild(num);
     outer.appendChild(inner);
@@ -276,12 +278,12 @@ function buildDish(){
     const phi=i*TAU+TAU/2;
     const g=svgEl('g',{transform:`rotate(${phi} ${CX} ${CY})`,'data-i':i});
     /* тень под плашкой: глазурь чуть приподнята над полем */
-    g.appendChild(svgEl('rect',{x:(CX-TILE_H/2+1.4).toFixed(2), y:(y0+2.4).toFixed(2),
+    g.appendChild(svgEl('rect',{x:(CX-TILE_H/2+1.2).toFixed(2), y:(y0+2).toFixed(2),
       width:TILE_H, height:len.toFixed(2), rx:(TILE_H/2).toFixed(2), ry:(TILE_H/2).toFixed(2),
-      fill:'rgba(28,18,6,.30)', filter:'url(#softShadow)','pointer-events':'none'}));
-    /* золотая оправка чуть шире самой плашки */
-    g.appendChild(svgEl('rect',{x:(CX-TILE_H/2-1.6).toFixed(2), y:(y0-1.6).toFixed(2),
-      width:(TILE_H+3.2), height:(len+3.2).toFixed(2), rx:((TILE_H+3.2)/2), ry:((TILE_H+3.2)/2),
+      fill:'rgba(28,18,6,.22)', filter:'url(#softShadow)','pointer-events':'none'}));
+    /* ободок: тонкая золотая линия, как роспись по краю плашки */
+    g.appendChild(svgEl('rect',{x:(CX-TILE_H/2-1.1).toFixed(2), y:(y0-1.1).toFixed(2),
+      width:(TILE_H+2.2), height:(len+2.2).toFixed(2), rx:((TILE_H+2.2)/2), ry:((TILE_H+2.2)/2),
       fill:'url(#gold)','pointer-events':'none'}));
     g.appendChild(svgEl('rect',{class:'tile','data-i':i, x:(CX-TILE_H/2).toFixed(2), y:y0.toFixed(2),
       width:TILE_H, height:len.toFixed(2), rx:(TILE_H/2).toFixed(2), ry:(TILE_H/2).toFixed(2)}));
@@ -296,47 +298,61 @@ function buildDish(){
     rotor.appendChild(g);
   }
 
-  /* середина тарелки: фарфоровая пипка с золотой розеткой — по ней видно вращение */
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:WELL,fill:'url(#wellG)',stroke:'rgba(78,58,24,.35)','stroke-width':'2.4'}));
+  /* дуга по радиусу r между углами a0 и a1 (в градусах: 0° — вправо, 90° — вниз) */
+  function arcPath(r,a0,a1){
+    const x0=CX+r*Math.cos(a0*Math.PI/180), y0=CY+r*Math.sin(a0*Math.PI/180);
+    const x1=CX+r*Math.cos(a1*Math.PI/180), y1=CY+r*Math.sin(a1*Math.PI/180);
+    return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  }
+
+  /* середина тарелки: неглубокая пипка. Дальний край освещён, ближний в тени,
+     по золотой розетке видно, как тарелка крутится */
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:WELL,fill:'url(#wellG)',stroke:'rgba(78,58,24,.18)','stroke-width':'1.4'}));
   rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:WELL,fill:'#7a6a4c','filter':'url(#speck)',opacity:'.10','pointer-events':'none'}));
+  rotor.appendChild(svgEl('path',{d:arcPath(WELL-1,22,158),fill:'none',stroke:'rgba(66,48,20,.22)','stroke-width':'2.4',
+    'stroke-linecap':'round','pointer-events':'none'}));
+  rotor.appendChild(svgEl('path',{d:arcPath(WELL-1,202,338),fill:'none',stroke:'rgba(255,252,240,.5)','stroke-width':'2',
+    'stroke-linecap':'round','pointer-events':'none'}));
   /* розетка: 12 золотых лучей по центру */
   for(let i=0;i<12;i++){
     const a=(i*30-90)*Math.PI/180, am=(i*30-90+15)*Math.PI/180;
-    const rOut=(i%2===0)?38:27;
+    const rOut=(i%2===0)?31:21;
     const p1=[CX+rOut*Math.cos(a), CY+rOut*Math.sin(a)];
-    const p2=[CX+20*Math.cos(am), CY+20*Math.sin(am)];
+    const p2=[CX+13*Math.cos(am), CY+13*Math.sin(am)];
     rotor.appendChild(svgEl('path',{d:`M ${CX} ${CY} L ${p1[0].toFixed(2)} ${p1[1].toFixed(2)} L ${p2[0].toFixed(2)} ${p2[1].toFixed(2)} Z`,
-      fill:'rgba(184,148,72,.34)'}));
+      fill:'rgba(184,148,72,.32)'}));
   }
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'38',fill:'none',stroke:'rgba(178,142,66,.55)','stroke-width':'1.4'}));
-  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'20',fill:'none',stroke:'rgba(178,142,66,.45)','stroke-width':'1.2'}));
-  for(let i=0;i<6;i++){
-    const a=(i*60-90)*Math.PI/180;
-    const x=CX+33*Math.cos(a), y=CY+33*Math.sin(a);
-    rotor.appendChild(svgEl('circle',{cx:x.toFixed(2),cy:y.toFixed(2),r:'2.6',fill:'url(#goldR)',stroke:'rgba(96,70,26,.5)','stroke-width':'.7'}));
-  }
+  rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'31',fill:'none',stroke:'rgba(178,142,66,.5)','stroke-width':'1.2'}));
   disc.appendChild(rotor);
 
-  /* неподвижный свет и блик глазури поверх тарелки */
+  /* неподвижный свет по фарфору: широкая подсветка, мягкое пятно и отблески по борту */
   disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R,fill:'url(#sheen)',class:'sheen','pointer-events':'none'}));
-  disc.appendChild(svgEl('ellipse',{cx:'140',cy:'120',rx:'60',ry:'28',fill:'url(#glossB)',class:'gloss',
-    transform:'rotate(-26 140 120)','pointer-events':'none'}));
-  disc.appendChild(svgEl('ellipse',{cx:'262',cy:'280',rx:'38',ry:'15',fill:'url(#glossB)',opacity:'.4',
-    transform:'rotate(-24 262 280)','pointer-events':'none'}));
+  disc.appendChild(svgEl('ellipse',{cx:'142',cy:'116',rx:'58',ry:'26',fill:'url(#glossB)',class:'gloss',
+    transform:'rotate(-26 142 116)','pointer-events':'none'}));
+  /* отблески на глазури: длинный мягкий и короткий резкий по верхнему левому борту */
+  disc.appendChild(svgEl('path',{d:arcPath(DISH_R-7,190,256),fill:'none',stroke:'rgba(255,255,252,.40)','stroke-width':'4.6',
+    'stroke-linecap':'round','pointer-events':'none'}));
+  disc.appendChild(svgEl('path',{d:arcPath(DISH_R-7,208,234),fill:'none',stroke:'rgba(255,255,255,.78)','stroke-width':'2.4',
+    'stroke-linecap':'round','pointer-events':'none'}));
+  /* тёплый отсвет снизу-справа */
+  disc.appendChild(svgEl('path',{d:arcPath(DISH_R-10,14,78),fill:'none',stroke:'rgba(255,238,208,.28)','stroke-width':'3',
+    'stroke-linecap':'round','pointer-events':'none'}));
 
   /* штырёк подставки, на котором висит тарелка */
-  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'13',fill:'url(#goldR)',stroke:'rgba(70,50,18,.6)','stroke-width':'1.6'}));
-  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'4.6',fill:'#3a2a12'}));
-  disc.appendChild(svgEl('circle',{cx:CX-2.6,cy:CY-3.2,r:'1.8',fill:'rgba(255,252,236,.7)'}));
+  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'11',fill:'url(#goldR)',stroke:'rgba(70,50,18,.55)','stroke-width':'1.4'}));
+  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'4',fill:'#3a2a12'}));
+  disc.appendChild(svgEl('circle',{cx:CX-2.2,cy:CY-2.8,r:'1.5',fill:'rgba(255,252,236,.7)'}));
   svg.appendChild(disc);
 
-  /* передняя полочка мольберта: тарелка лежит за ней */
+  /* передняя полочка мольберта: тарелка лежит за ней, на фарфоре — тень от полочки */
   const standFront=svgEl('g',{id:'stand-front','class':'stand'});
-  standFront.appendChild(svgEl('rect',{x:'106',y:'362',width:'188',height:'18',rx:'8',fill:'url(#wood)',stroke:'#150d05','stroke-width':'2'}));
-  standFront.appendChild(svgEl('rect',{x:'106',y:'362',width:'188',height:'18',rx:'8',fill:'#e9c98c',filter:'url(#grainWood)',opacity:'.38'}));
-  standFront.appendChild(svgEl('rect',{x:'106',y:'362',width:'188',height:'4',rx:'2',fill:'rgba(255,228,176,.20)'}));
-  for(const bx of [120,280]){
-    standFront.appendChild(svgEl('circle',{cx:bx,cy:'371',r:'3',fill:'url(#goldR)',stroke:'rgba(20,12,4,.6)','stroke-width':'.8'}));
+  standFront.appendChild(svgEl('rect',{x:'118',y:'366',width:'164',height:'7',rx:'3',fill:'rgba(20,12,4,.30)',
+    filter:'url(#softShadow)','pointer-events':'none'}));
+  standFront.appendChild(svgEl('rect',{x:'118',y:'374',width:'164',height:'18',rx:'8',fill:'url(#wood)',stroke:'#150d05','stroke-width':'2'}));
+  standFront.appendChild(svgEl('rect',{x:'118',y:'374',width:'164',height:'18',rx:'8',fill:'#e9c98c',filter:'url(#grainWood)',opacity:'.38'}));
+  standFront.appendChild(svgEl('rect',{x:'118',y:'374',width:'164',height:'4',rx:'2',fill:'rgba(255,228,176,.22)'}));
+  for(const bx of [132,268]){
+    standFront.appendChild(svgEl('circle',{cx:bx,cy:'383',r:'2.8',fill:'url(#goldR)',stroke:'rgba(20,12,4,.6)','stroke-width':'.8'}));
   }
   svg.appendChild(standFront);
 
@@ -476,6 +492,7 @@ const ROLL_K=180/(Math.PI*DISH_R);                /* градусов повор
 const FLOOR_Y=436;                                /* пол: низ основания подставки */
 const FLOOR_DROP=FLOOR_Y-DISH_R-CY;               /* на сколько тарелка опустится, встав на пол (54) */
 const ESCAPE_V=0.62;                              /* предельная скорость побега, градусов на миллисекунду */
+const BACK_DELAY=3000;                            /* пауза за правым краем, прежде чем тарелка выедет слева */
 function slotOf(a){ return Math.round((((a%360)+360)%360)/TAU); }
 function reducedMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
 
@@ -685,8 +702,20 @@ function spin(){
           shakeMount();
         }
       }
-      /* за краем экрана тарелка катится ещё немного, потом возвращается слева */
+      /* за краем экрана тарелка катится ещё немного, потом пауза — и возврат слева */
       return px >= right+140 && t > SETTLE+900;
+    }, ()=> offPause(done));
+  }
+  /* тарелка скрылась за правым краем: держим паузу, и только потом она
+     выезжает слева. Всё это время подставка стоит пустая. */
+  function offPause(done){
+    const right=offscreenShift(1);
+    setDisc(right+140, FLOOR_DROP);
+    prevT=performance.now();
+    phase(BACK_DELAY, (p, now)=>{
+      const dt=tick(now);
+      chase(ESCAPE_V*0.7, dt);                   /* за экраном тарелка потихоньку докручивается */
+      spinBy(dt);
     }, ()=> rollBack(done));
   }
   /* возвращается слева, накатом, с той же скоростью, и доезжает до подставки */
@@ -800,20 +829,19 @@ function showWord(i){
   card.scrollIntoView({behavior:reducedMotion()?'auto':'smooth', block:'nearest'});
 }
 
-/* ------------------------------ список найденных ------------------------------ */
-function renderFound(){
-  const box=$('#found-list');
+/* ------------------------------ объяснённые слова ------------------------------ */
+/* список больше не показывают: счётчик объяснённых слов живёт на кнопке «Сначала»,
+   а сами слова зачёркиваются на тарелке */
+function updateResetChip(){
   const chip=$('#btn-reset');
   if(chip) chip.textContent = state.found.length? '↺ Сначала · '+state.found.length : '↺ Сначала';
-  if(!state.found.length){ box.innerHTML='<span class="empty-note">Пока ничего не нашли — крутите тарелку и ищите слово в книгах.</span>'; return; }
-  box.innerHTML=state.found.slice().reverse().map(f=>'<span class="fchip">'+f.w+' <small>'+f.t+'</small></span>').join('');
 }
 function markFound(){
   const w=$('#word').textContent;
   if(!w || w==='—' || alreadyFound(w)) return;
   const t=new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   state.found.push({w:w,t:t});
-  save(); renderFound(); markDone();
+  save(); updateResetChip(); markDone();
   if(!updateSpinState()) allExplained();
   $('#found').disabled=true;
 }
@@ -881,16 +909,11 @@ function toggleTheme(){
 $('#spin').addEventListener('click',spin);
 $('#dish-tap').addEventListener('click',spin);
 $('#found').addEventListener('click',markFound);
-$('#clear-found').addEventListener('click',()=>{
-  if(!state.found.length) return;
-  if(!confirm('Удалить список найденных слов?')) return;
-  state.found=[]; save(); renderFound(); markDone(); updateSpinState();
-});
 $('#btn-reset').addEventListener('click',()=>{
   if(!state.found.length && !state.spins) return;
   if(!confirm('Начать заново? Список объяснённых слов очистится, и все слова снова встанут на тарелку.')) return;
   state.found=[]; state.spins=0; save();
-  renderFound(); markDone(); highlight(-1); resetCard(); updateSpinState();
+  updateResetChip(); markDone(); highlight(-1); resetCard(); updateSpinState();
 });
 $('#btn-theme').addEventListener('click',toggleTheme);
 document.addEventListener('keydown',e=>{
@@ -907,7 +930,7 @@ window.addEventListener('resize',()=>{
 rot=-(Math.floor(Math.random()*SECTORS)*TAU + TAU/2);
 applyTheme();
 initAmbient();
-renderFound();
+updateResetChip();
 resetCard();
 updateSpinState();
 setPawl(0);
