@@ -203,22 +203,35 @@ function buildDish(){
   standBack.appendChild(svgEl('rect',{x:'82',y:'410',width:'236',height:'26',rx:'7',fill:'#e9c98c',filter:'url(#grainWood)',opacity:'.38'}));
   /* табличка с названием: светлая отполированная пластина на тёмном дереве,
      буквы тёмные и с мягкой подсветкой снизу — как выдавленные */
-  standBack.appendChild(svgEl('rect',{x:'104',y:'416',width:'192',height:'20',rx:'5',fill:'rgba(10,6,2,.55)',
-    filter:'url(#softShadow)','pointer-events':'none'}));
-  standBack.appendChild(svgEl('rect',{x:'104',y:'413',width:'192',height:'20',rx:'5',fill:'url(#plateG)',
-    stroke:'rgba(28,18,6,.7)','stroke-width':'1.3'}));
-  standBack.appendChild(svgEl('rect',{x:'107',y:'416',width:'186',height:'14',rx:'3.5',fill:'none',
-    stroke:'rgba(96,68,22,.32)','stroke-width':'.9'}));
-  const nameHi=svgEl('text',{class:'mount-txt-hi',x:CX,y:'429.4','text-anchor':'middle'});
-  nameHi.textContent='ТАРЕЛКА СЛОВ';
+  const PLATE={x:104, y:413, w:192, h:20};   /* пластина таблички на основании */
+  standBack.appendChild(svgEl('rect',{x:PLATE.x,y:PLATE.y+3,width:PLATE.w,height:PLATE.h,rx:'5',
+    fill:'rgba(10,6,2,.55)',filter:'url(#softShadow)','pointer-events':'none'}));
+  standBack.appendChild(svgEl('rect',{x:PLATE.x,y:PLATE.y,width:PLATE.w,height:PLATE.h,rx:'5',
+    fill:'url(#plateG)',stroke:'rgba(28,18,6,.7)','stroke-width':'1.3'}));
+  standBack.appendChild(svgEl('rect',{x:PLATE.x+3,y:PLATE.y+3,width:PLATE.w-6,height:PLATE.h-6,rx:'3.5',
+    fill:'none',stroke:'rgba(96,68,22,.32)','stroke-width':'.9'}));
+  const NAME='ТАРЕЛКА СЛОВ', NAME_SP=2.8;
+  const nameHi=svgEl('text',{class:'mount-txt-hi',x:CX,y:'428','text-anchor':'middle'});
+  nameHi.textContent=NAME;
   standBack.appendChild(nameHi);
-  const nameTxt=svgEl('text',{class:'mount-txt',x:CX,y:'428.5','text-anchor':'middle'});
-  nameTxt.textContent='ТАРЕЛКА СЛОВ';
+  const nameTxt=svgEl('text',{class:'mount-txt',x:CX,y:'428','text-anchor':'middle'});
+  nameTxt.textContent=NAME;
   standBack.appendChild(nameTxt);
   for(const bx of [100,300]){
     standBack.appendChild(svgEl('circle',{cx:bx,cy:'423',r:'3.2',fill:'url(#goldR)',stroke:'rgba(20,12,4,.6)','stroke-width':'.8'}));
   }
   svg.appendChild(standBack);
+
+  /* ставим надпись ровно по центру пластины: базовая линия сама по себе ниже
+     центра строки, а letter-spacing оставляет пустое место после последней буквы */
+  try{
+    const fs=parseFloat(getComputedStyle(nameTxt).fontSize)||11.5;
+    const capH=0.7*fs, bb=nameTxt.getBBox();
+    const ny=PLATE.y+PLATE.h/2+capH/2;
+    const nx=CX+(CX-(bb.x+(bb.width-NAME_SP)/2));
+    nameTxt.setAttribute('x',nx.toFixed(2)); nameTxt.setAttribute('y',ny.toFixed(2));
+    nameHi.setAttribute('x',nx.toFixed(2));  nameHi.setAttribute('y',(ny+0.9).toFixed(2));
+  }catch(e){ /* если SVG ещё не разложен — остаются базовые координаты */ }
 
   /* ---- сама тарелка: фарфор, борт, кант, сектора, плашки ---- */
   const disc=svgEl('g',{id:'disc'});             /* вся тарелка: её можно сдвинуть, подставка остаётся */
