@@ -1,12 +1,12 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Колесо слов — крути, найди слово и расскажи, что оно значит</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%A1%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=23">
+<title>Тарелка слов — крути, найди слово и расскажи, что оно значит</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%BD%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css?v=24">
 </head>
 <body>
 
@@ -19,26 +19,26 @@
 
 <header class="topbar">
   <div class="brand">
-    <span class="logo">🎡</span>
-    <span class="brand-text"><b>Колесо слов</b><small>крути · найди слово в книгах · объясни</small></span>
+    <span class="logo">🍽️</span>
+    <span class="brand-text"><b>Тарелка слов</b><small>крути · найди слово в книгах · объясни</small></span>
   </div>
   <div class="top-actions">
-    <button class="chip" id="btn-reset" title="Начать заново: зачёркнутые слова вернутся на колесо">↺ Сначала</button>
+    <button class="chip" id="btn-reset" title="Начать заново: зачёркнутые слова вернутся на тарелку">↺ Сначала</button>
     <button class="chip btn-theme" id="btn-theme" title="Светлая или ночная тема">🌙 Ночная</button>
   </div>
 </header>
 
 <main>
-  <section class="wheel-zone">
+  <section class="dish-zone">
     <div class="stage">
-      <div class="wheel-frame" id="wheel-frame">
-        <svg id="wheel" viewBox="0 0 400 448" role="img" aria-label="Колесо слов: двенадцать секторов со словами, сверху стрелка-защёлка"></svg>
-        <button class="wheel-tap" id="wheel-tap" aria-label="Крутить колесо"></button>
+      <div class="dish-frame" id="dish-frame">
+        <svg id="dish" viewBox="0 0 400 448" role="img" aria-label="Тарелка слов: двенадцать секторов со словами, сверху ложечка-защёлка"></svg>
+        <button class="dish-tap" id="dish-tap" aria-label="Крутить тарелку"></button>
       </div>
     </div>
 
     <div class="spin-row">
-      <button class="btn primary big" id="spin">🎡 Крутить колесо</button>
+      <button class="btn primary big" id="spin">🍽️ Крутить тарелку</button>
     </div>
   </section>
 
@@ -60,6 +60,6 @@
   </section>
 </main>
 
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>

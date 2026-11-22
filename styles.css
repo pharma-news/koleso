@@ -1,10 +1,12 @@
 /* ============================================================
-   Колесо слов — тяжёлый, «настоящий» вид
-   Латунь, тёмное дерево, эмалевые сектора, станина.
+   Тарелка слов — фарфор, золото, глазурь
+   Фарфоровая тарелка с глазурованными секторами и золотым кантом,
+   деревянный мольберт-подставка, ложечка-защёлка у края.
    Ночная тема по умолчанию, светлая — по желанию.
    ============================================================ */
 :root{
   --brass:#c9a35c; --brass-deep:#8f6f32; --brass-hi:#f0dca8;
+  --gold-ink:#a8823a;
   --wood:#3b2717;
   --bg:#100e0b; --bg-2:#191510; --card:#1b1813; --card-2:#221e17;
   --ink:#efe9dc; --muted:#a1998a; --line:#3a332a; --line-2:#4a4235;
@@ -17,6 +19,7 @@
 }
 html[data-theme=light]{
   --brass:#9a7830; --brass-deep:#6f5420; --brass-hi:#e6cf98;
+  --gold-ink:#7d5f22;
   --bg:#f4efe4; --bg-2:#eae3d5; --card:#fffdf7; --card-2:#f7f2e7;
   --ink:#241f18; --muted:#6b6252; --line:#dcd2c0; --line-2:#eae2d4;
   --ok-bg:#f3ecdb; --ok-line:#c6b189;
@@ -43,7 +46,7 @@ html[data-theme=light] body{
 main{max-width:1060px; margin:0 auto; padding:16px 14px; display:grid; gap:18px}
 
 /* --------------------------- живой фон ---------------------------
-   Тёплый свет лампы, который медленно дышит и усиливается, когда колесо
+   Тёплый свет лампы, который медленно дышит и усиливается, когда тарелка
    крутится; пылинки в луче; свет слегка гуляет по комнате; плёночное зерно.
    Всё под контентом, на клик не реагирует. */
 .ambient{position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;
@@ -126,65 +129,67 @@ button.chip{cursor:pointer; min-height:40px; touch-action:manipulation; transiti
 button.chip:hover{border-color:var(--brass); color:var(--brass)}
 .top-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
 
-/* --------------------------- колесо --------------------------- */
-.wheel-zone{display:flex; flex-direction:column; align-items:center; gap:18px}
+/* --------------------------- тарелка --------------------------- */
+.dish-zone{display:flex; flex-direction:column; align-items:center; gap:18px}
 .stage{perspective:1300px}
-.wheel-frame{position:relative; width:min(92vw, 500px); aspect-ratio:400/448; transform:rotateX(6deg);
+.dish-frame{position:relative; width:min(92vw, 500px); aspect-ratio:400/448; transform:rotateX(6deg);
   filter:drop-shadow(0 24px 34px rgba(0,0,0,.5)); transition:transform .5s ease}
-html[data-theme=light] .wheel-frame{filter:drop-shadow(0 18px 26px rgba(70,50,25,.22))}
-.wheel-frame.spin{transform:rotateX(3deg)}
-/* во время побега убираем CSS-тень: она бы обрезала колесо на границе блока */
-.wheel-frame.rolling{filter:none}
-.wheel-frame.hit{animation:thunk .6s cubic-bezier(.2,1.3,.4,1)}
+html[data-theme=light] .dish-frame{filter:drop-shadow(0 18px 26px rgba(70,50,25,.22))}
+.dish-frame.spin{transform:rotateX(3deg)}
+/* во время побега убираем CSS-тень: она бы обрезала тарелку на границе блока */
+.dish-frame.rolling{filter:none}
+.dish-frame.hit{animation:thunk .6s cubic-bezier(.2,1.3,.4,1)}
 @keyframes thunk{0%{transform:rotateX(6deg) scale(1.012)} 40%{transform:rotateX(7deg) scale(.997)} 100%{transform:rotateX(6deg) scale(1)}}
-#wheel{width:100%; height:100%; display:block; overflow:visible}
-.wheel-tap{position:absolute; left:6%; right:6%; top:2%; height:80%; border-radius:50%; border:none;
+#dish{width:100%; height:100%; display:block; overflow:visible}
+.dish-tap{position:absolute; left:5%; right:5%; top:1%; height:82%; border-radius:50%; border:none;
   background:transparent; cursor:pointer; touch-action:manipulation; z-index:5}
-.wheel-tap:focus-visible{outline:3px solid var(--brass); outline-offset:8px; border-radius:50%}
-.wheel-tap.busy{pointer-events:none}
+.dish-tap:focus-visible{outline:3px solid var(--brass); outline-offset:8px; border-radius:50%}
+.dish-tap.busy{pointer-events:none}
 
-/* лицо колеса */
-.sector{stroke:rgba(16,10,4,.55); stroke-width:1.5}
+/* глазурованные поля секторов */
+.sector{stroke:rgba(46,32,14,.42); stroke-width:1.5}
 .sector.win{stroke:var(--brass); stroke-width:4; filter:drop-shadow(0 0 10px rgba(201,163,92,.55)) brightness(1.12);
   animation:winGlow 2.8s ease-in-out infinite}
 @keyframes winGlow{0%,100%{stroke-width:3.4; filter:brightness(1.06) drop-shadow(0 0 6px rgba(201,163,92,.4))}
   50%{stroke-width:5; filter:brightness(1.2) drop-shadow(0 0 16px rgba(201,163,92,.7))}}
-.plate{fill:#f2e9d6; stroke:rgba(28,20,10,.55); stroke-width:1.4}
-.plate-txt{fill:#241b10; font-weight:700; letter-spacing:.7px; text-anchor:middle; font-family:var(--font)}
-.plate.hot{fill:#fff8e6; stroke:var(--brass-deep); stroke-width:2.2; filter:drop-shadow(0 0 8px rgba(201,163,92,.6))}
+/* плашка со словом: белая по глазури, в тонкой золотой оправке */
+.tile{fill:#fffdf6; stroke:rgba(116,88,36,.5); stroke-width:1.2}
+.tile-txt{fill:#2a2013; font-weight:700; letter-spacing:.7px; text-anchor:middle; font-family:var(--font)}
+.tile.hot{fill:#ffffff; stroke:var(--brass-deep); stroke-width:2.4; filter:drop-shadow(0 0 8px rgba(201,163,92,.65))}
 /* объяснённое слово: плашка тускнеет, слово зачёркнуто линией вдоль текста */
-.plate.done{fill:#c8bda8; stroke:rgba(28,20,10,.5)}
-.plate-txt.done{fill:#6b604c}
+.tile.done{fill:#dcd2bf; stroke:rgba(90,70,32,.45)}
+.tile-txt.done{fill:#6f6552}
 .strike{stroke:#8e3324; stroke-width:2.6; stroke-linecap:round; opacity:0; transition:opacity .25s}
 .strike.done{opacity:.85}
-/* римские номера секторов — гравировка по латуни */
-.roman{fill:#dcb877; stroke:rgba(12,8,3,.55); stroke-width:.5px; paint-order:stroke; letter-spacing:.5px;
-  font-weight:700; font-family:var(--serif); opacity:.9}
+/* римские номера секторов — золотая роспись по фарфору */
+.roman{fill:var(--gold-ink); stroke:rgba(255,251,238,.6); stroke-width:.5px; paint-order:stroke;
+  letter-spacing:.5px; font-weight:700; font-family:var(--serif); opacity:.95}
 .sheen{opacity:.9}
+.gloss{opacity:.85}
 .mount-txt{fill:var(--brass); font-size:11px; letter-spacing:3px; font-weight:700; font-family:var(--font)}
-#pawl{transform-box:view-box; transform-origin:200px 10px; will-change:transform; transition:transform .2s ease-out}
-.wheel-frame.spin #pawl{transition:none}
-.wheel-frame:not(.spin):hover #pawl{transform:rotate(-6deg)}
+#pawl{transform-box:view-box; transform-origin:200px 6px; will-change:transform; transition:transform .2s ease-out}
+.dish-frame.spin #pawl{transition:none}
+.dish-frame:not(.spin):hover #pawl{transform:rotate(-8deg)}
 #rotor{will-change:transform}
 #disc{transform-box:view-box; will-change:transform}
-/* станина вздрагивает, когда колесо возвращается на ось */
-#mount{transform-box:view-box; transform-origin:200px 430px}
-#mount.shake{animation:mountShake .6s cubic-bezier(.3,.8,.4,1)}
+/* подставка вздрагивает, когда тарелка возвращается на штырёк */
+.stand{transform-box:view-box; transform-origin:200px 430px}
+.stand.shake{animation:mountShake .6s cubic-bezier(.3,.8,.4,1)}
 @keyframes mountShake{0%{transform:translate(0,0)} 18%{transform:translate(0,4px)} 42%{transform:translate(-1.5px,-2px)}
   66%{transform:translate(1px,1.5px)} 100%{transform:translate(0,0)}}
 
 /* искры, свечение и ударная волна */
-.spark{fill:#ffe9bd; stroke:rgba(255,168,78,.4); stroke-width:1.6}
+.spark{fill:#fff3d2; stroke:rgba(255,178,88,.4); stroke-width:1.4}
 #halo{transition:opacity .25s linear; transform-box:view-box}
 #streaks{transition:opacity .2s linear}
-#shock{opacity:0; transform-box:view-box; transform-origin:200px 30px}
+#shock{opacity:0; transform-box:view-box; transform-origin:200px 24px}
 #shock.go{animation:shockGo 1.1s cubic-bezier(.12,.72,.28,1)}
 @keyframes shockGo{0%{opacity:.95; transform:scale(.25)} 55%{opacity:.45} 100%{opacity:0; transform:scale(3.4)}}
-.wheel-frame.spin #pawl .foot{fill:#fff3d2; filter:drop-shadow(0 0 5px rgba(255,205,120,.9))}
-.wheel-frame.hit #pawl .foot{animation:footFlash .8s ease-out}
+.dish-frame.spin #pawl .foot{fill:#fff8e2; filter:drop-shadow(0 0 5px rgba(255,214,140,.9))}
+.dish-frame.hit #pawl .foot{animation:footFlash .8s ease-out}
 @keyframes footFlash{0%{fill:#fffbe8; filter:drop-shadow(0 0 12px rgba(255,215,130,1))} 100%{filter:drop-shadow(0 0 0 rgba(255,215,130,0))}}
-.wheel-frame.spin .mount-txt{animation:plateFlash 1.4s ease-out}
-@keyframes plateFlash{0%{fill:#fff1cd} 100%{fill:var(--brass)}}
+.dish-frame.spin .mount-txt{animation:nameFlash 1.4s ease-out}
+@keyframes nameFlash{0%{fill:#fff1cd} 100%{fill:var(--brass)}}
 
 /* --------------------------- кнопки --------------------------- */
 .spin-row{display:flex; flex-direction:column; align-items:center; gap:10px; width:100%}
@@ -239,22 +244,22 @@ h2{font-family:var(--serif); font-size:1.2rem; margin:0 0 10px; letter-spacing:.
   main{padding:12px 10px}
   .topbar{padding:9px 10px}
   .brand-text small{font-size:.76rem}
-  .wheel-frame{width:min(94vw, 430px)}
+  .dish-frame{width:min(94vw, 430px)}
   .btn.big{width:100%}
   .word-card{padding:14px 14px}
 }
-/* --------------------------- компьютер: колесо и карточка рядом --------------------------- */
+/* --------------------------- компьютер: тарелка и карточка рядом --------------------------- */
 @media (min-width:860px){
   main{grid-template-columns:minmax(0,1fr) 400px; align-items:start}
-  .wheel-zone{grid-column:1; grid-row:1}
+  .dish-zone{grid-column:1; grid-row:1}
   .result{grid-column:2; grid-row:1}
   .found-list{grid-column:1/-1; grid-row:2}
 }
 /* --------------------------- альбомная ориентация телефона --------------------------- */
 @media (max-width:859px) and (orientation:landscape){
   main{grid-template-columns:minmax(0,1fr) minmax(220px,330px); align-items:start}
-  .wheel-zone{grid-column:1}
+  .dish-zone{grid-column:1}
   .result{grid-column:2}
   .found-list{grid-column:1/-1}
-  .wheel-frame{width:min(56vh, 430px)}
+  .dish-frame{width:min(56vh, 430px)}
 }
