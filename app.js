@@ -3,7 +3,7 @@
    12 секторов, слова зафиксированы (добавлять свои нельзя).
    Фарфоровая тарелка: глазурованные сектора, золотой кант и
    золотые точки по борту, роспись в середине, деревянный
-   мольберт-подставка и ложечка-защёлка у края тарелки.
+   мольберт-подставка и золотая стрелка-указатель у края тарелки.
    Звука и озвучки слов нет.
    ============================================================ */
 const WORDS=['Бумага','Арена','Награда','Чемодан','Маскарад','Ураган','Радуга','Мешок','Басня','Лагерь','Договор','Обычай'];
@@ -12,11 +12,11 @@ const CX=200, CY=196;              /* центр тарелки в единиц�
 const DISH_R=190;                  /* внешний край: большая тарелка занимает почти весь кадр */
 const R=154;                       /* расписное поле, остальное — широкий чистый борт */
 const RIM_MID=(DISH_R+R)/2;        /* середина широкого борта тарелки */
-const DOT_R=170;                   /* золотые точки по борту, о них стучит ложечка */
+const DOT_R=170;                   /* золотые точки по борту против острия стрелки */
 const WELL=60;                     /* неглубокая фарфоровая пипка в середине тарелки */
-const TILE_OUT=146, TILE_IN=66, TILE_H=26; /* плашки со словами: вдоль радиуса, читаются вниз к центру */
+const TILE_OUT=148, TILE_IN=64, TILE_H=26; /* плашки со словами: вдоль радиуса, читаются вниз к центру */
 const ROMAN_R=51;                  /* римские номера секторов */
-const PIVOT_X=200, PIVOT_Y=6;      /* ось ложечки-защёлки */
+const PIVOT_X=200, PIVOT_Y=6;      /* ось стрелки-указателя */
 const KEY='tarelka_v1', OLD_KEY='koleso_v1';
 const SVGNS='http://www.w3.org/2000/svg';
 
@@ -62,14 +62,27 @@ function accentOf(i){
   const [h,s,l]=PALETTE[i%PALETTE.length];
   return `hsl(${h} ${clamp(s+22,20,80)}% ${clamp(l+26,30,72)}%)`;
 }
-/* плашка лежит вдоль радиуса: длина ограничена полем от середины до борта */
+/* Плашка лежит вдоль радиуса: длина ограничена полем от середины до борта.
+   Размер слова и длину плашки считаем по реальной ширине надписи в том же SVG,
+   иначе широкие «М», «О», «Ш» вылезают за оправку — как было с МЕШОКом. */
 const TILE_SPAN = TILE_OUT - TILE_IN;
-function labelSize(w){
-  const base = w.length<=5 ? 19 : w.length<=6 ? 17.5 : w.length<=7 ? 16 : 15;
-  const fit = ((TILE_SPAN-16)/w.length - 0.7)/0.62;
-  return Math.round(Math.min(base, fit)*10)/10;
+const TILE_PAD = 20;                 /* запас по концам плашки, с учётом скругления */
+let measTxt=null;
+function textW(txt, size){
+  try{
+    if(!measTxt) measTxt=svgEl('text',{class:'tile-txt', x:'-9999', y:'-9999', 'text-anchor':'middle'});
+    measTxt.setAttribute('font-size', size);
+    measTxt.textContent=txt;
+    if(!measTxt.parentNode) $('#dish').appendChild(measTxt);
+    return measTxt.getBBox().width;
+  }catch(e){ return txt.length*size*0.72; }   /* если SVG ещё не разложен — грубая прикидка */
 }
-function tileLen(txt, size){ return Math.min(TILE_SPAN, txt.length*(size*0.62+0.7)+16); }
+function labelFit(raw){
+  const txt=labelText(raw).toUpperCase();          /* на тарелке слова заглавными — мерим так же */
+  let size = txt.length<=5 ? 19 : txt.length<=6 ? 17 : txt.length<=7 ? 15.5 : 14.5;
+  while(size>9 && textW(txt, size) > TILE_SPAN-TILE_PAD) size=Math.round((size-0.5)*10)/10;
+  return {txt:txt, size:size, len:Math.min(TILE_SPAN, textW(txt, size)+TILE_PAD)};
+}
 function labelText(w){ return w.length>11 ? w.slice(0,10)+'…' : w; }
 
 /* ------------------------------ сборка тарелки ------------------------------ */
@@ -213,7 +226,7 @@ function buildDish(){
   rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:R+13,fill:'none',stroke:'rgba(178,144,72,.5)','stroke-width':'1.2'}));
   rotor.appendChild(svgEl('circle',{cx:CX,cy:CY,r:DISH_R-4,fill:'none',stroke:'url(#gold)','stroke-width':'1.8'}));
 
-  /* золотые точки по борту: по ним стучит ложечка */
+  /* золотые точки по борту: против них щёлкает остриём стрелка */
   for(let i=0;i<24;i++){
     const a=(i*15-90)*Math.PI/180;
     const x=CX+DOT_R*Math.cos(a), y=CY+DOT_R*Math.sin(a);
@@ -272,8 +285,8 @@ function buildDish(){
      читаются вдоль радиуса — от борта к середине сектора.
      Это роспись по глазури: белая плашка в тонкой золотой оправке. */
   for(let i=0;i<SECTORS;i++){
-    const txt=labelText(words[i]), size=labelSize(txt);
-    const len=tileLen(txt, size), mid=(TILE_OUT+TILE_IN)/2;
+    const fit=labelFit(words[i]), txt=fit.txt, size=fit.size;
+    const len=fit.len, mid=(TILE_OUT+TILE_IN)/2;
     const y0=CY-mid-len/2, cy=CY-mid;
     const phi=i*TAU+TAU/2;
     const g=svgEl('g',{transform:`rotate(${phi} ${CX} ${CY})`,'data-i':i});
@@ -290,13 +303,14 @@ function buildDish(){
     const t=svgEl('text',{class:'tile-txt', 'data-i':i, x:CX, y:cy.toFixed(2), 'font-size':size,
       'text-anchor':'middle', 'dominant-baseline':'central',
       transform:`rotate(90 ${CX} ${cy.toFixed(2)})`});
-    t.textContent=txt.toUpperCase();
+    t.textContent=txt;
     g.appendChild(t);
     /* зачёркивание: отдельная линия вдоль слова (в SVG text-decoration ненадёжен) */
     g.appendChild(svgEl('line',{class:'strike','data-i':i, x1:CX, x2:CX,
-      y1:(cy-(len-18)/2).toFixed(2), y2:(cy+(len-18)/2).toFixed(2)}));
+      y1:(cy-(len-TILE_PAD)/2).toFixed(2), y2:(cy+(len-TILE_PAD)/2).toFixed(2)}));
     rotor.appendChild(g);
   }
+  if(measTxt && measTxt.parentNode) measTxt.remove();   /* примерочный текст больше не нужен */
 
   /* дуга по радиусу r между углами a0 и a1 (в градусах: 0° — вправо, 90° — вниз) */
   function arcPath(r,a0,a1){
@@ -356,17 +370,17 @@ function buildDish(){
   }
   svg.appendChild(standFront);
 
-  /* тень ложечки, падающая на глазурь */
+  /* тень стрелки, падающая на глазурь */
   svg.appendChild(svgEl('ellipse',{cx:CX,cy:CY-R+20,rx:'14',ry:'22',fill:'rgba(40,28,10,.20)',
     filter:'url(#softShadow)','pointer-events':'none'}));
 
-  /* кронштейн и ложечка-защёлка */
+  /* кронштейн и стрелка-указатель */
   svg.appendChild(svgEl('path',{d:'M181,-4 L219,-4 L213,11 L187,11 Z',fill:'url(#wood)',stroke:'#150d05','stroke-width':'1.8'}));
   svg.appendChild(svgEl('path',{d:'M181,-4 L219,-4 L217,3 L183,3 Z',fill:'rgba(255,228,176,.16)'}));
   for(const bx of [189,211]){
     svg.appendChild(svgEl('circle',{cx:bx,cy:'2',r:'2.2',fill:'url(#goldR)',stroke:'rgba(20,12,4,.6)','stroke-width':'.7'}));
   }
-  /* искры из-под ложечки */
+  /* искры из-под острия стрелки */
   const fx=svgEl('g',{id:'fx','pointer-events':'none'});
   for(let i=0;i<SPARK_MAX;i++) fx.appendChild(svgEl('circle',{class:'spark',r:'1',cx:'-20',cy:'-20',opacity:'0'}));
   svg.appendChild(fx);
@@ -386,11 +400,11 @@ function buildDish(){
   pawl.appendChild(svgEl('path',{d:'M196.6,3 L199,3 L198.4,19 L197.2,19 Z',fill:'rgba(255,252,236,.5)'}));
   pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'8',fill:'url(#goldR)',stroke:'rgba(70,50,18,.75)','stroke-width':'1.6'}));
   pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'2.4',fill:'#3a2a12'}));
-  /* ложечка: её чашечка стукает по золотым точкам по борту */
-  pawl.appendChild(svgEl('ellipse',{class:'foot',cx:CX,cy:'24',rx:'6.2',ry:'7.8',
-    fill:'url(#goldR)',stroke:'rgba(70,50,18,.7)','stroke-width':'1.2'}));
-  pawl.appendChild(svgEl('ellipse',{cx:CX,cy:'24.6',rx:'4.2',ry:'5.6',fill:'rgba(112,82,30,.22)','pointer-events':'none'}));
-  pawl.appendChild(svgEl('ellipse',{cx:CX-1.8,cy:'21',rx:'1.6',ry:'2.2',fill:'rgba(255,252,236,.8)','pointer-events':'none'}));
+  /* стрелка-указатель: остриё стоит над золотыми точками по борту */
+  pawl.appendChild(svgEl('path',{class:'foot',d:'M189.5,16 L210.5,16 L200,30.5 Z',
+    fill:'url(#goldR)',stroke:'rgba(70,50,18,.7)','stroke-width':'1.2','stroke-linejoin':'round'}));
+  pawl.appendChild(svgEl('path',{d:'M193,18.6 L207,18.6 L200,27.4 Z',fill:'rgba(112,82,30,.20)','pointer-events':'none'}));
+  pawl.appendChild(svgEl('path',{d:'M192.6,18 L197.8,18 L195.4,22.4 Z',fill:'rgba(255,252,236,.75)','pointer-events':'none'}));
   svg.appendChild(pawl);
 
   highlight(lastWin);
@@ -411,7 +425,7 @@ function highlight(i){
 function setPawl(deg){
   const p=$('#pawl');
   if(!p) return;
-  /* когда ложечка в покое, снимаем inline-стиль — тогда работает :hover */
+  /* когда стрелка в покое, снимаем inline-стиль — тогда работает :hover */
   p.style.transform = Math.abs(deg)<0.06 ? '' : `rotate(${deg.toFixed(2)}deg)`;
 }
 
@@ -424,7 +438,7 @@ function fxInit(){
   sparks=[];
   sparkNodes=Array.from(document.querySelectorAll('#fx .spark'));
 }
-/* ложечка стукает по золотой точке на борту — летят искры;
+/* стрелка щёлкает остриём по золотой точке на борту — летят искры;
    можно указать своё место удара (например, точку на полу) и разлёт в обе стороны */
 function sparkBurst(n, ox, oy, both){
   const X=(ox===undefined? CX : ox), Y=(oy===undefined? 24 : oy);
@@ -551,7 +565,7 @@ function spin(){
   if(i<0){ allExplained(); return; }
   state.spins=(state.spins||0)+1; save();
   const escape=(state.spins%ESCAPE_EVERY===0) && !reducedMotion();
-  const jitter=(Math.random()*2-1)*11;              /* ложечка встаёт внутрь сектора */
+  const jitter=(Math.random()*2-1)*11;              /* остриё встаёт внутрь сектора */
   const target=(((-(i*TAU+TAU/2)-jitter)%360)+360)%360;
   const turns=SPIN.turns+Math.floor(Math.random()*(SPIN.extra+1));
   const from=rot;
@@ -589,7 +603,7 @@ function spin(){
       if(!early && p<1) requestAnimationFrame(f); else onDone();
     })(performance.now());
   }
-  /* ближайший угол, на котором нужный сектор встанет на ложечку */
+  /* ближайший угол, на котором нужный сектор встанет под стрелку */
   function nextTarget(minAngle, extraTurns){
     return minAngle + ((((target-(((minAngle%360)+360)%360))%360)+360)%360) + extraTurns*360;
   }
@@ -643,7 +657,7 @@ function spin(){
     if(reducedMotion()) return;
     rotor.style.filter = v>0.18 ? `blur(${clamp(v*4,0,3).toFixed(2)}px)` : '';
     setGlow(v);
-    if(onAxle){                                  /* ложечка щёлкает только по своим золотым точкам */
+    if(onAxle){                                  /* стрелка щёлкает только по своим золотым точкам */
       const slot=slotOf(rot);
       if(slot!==prevSlot){
         pawlAngle=Math.min(11, 4+v*14);
@@ -926,7 +940,7 @@ window.addEventListener('resize',()=>{
 });
 
 /* ------------------------------ старт ------------------------------ */
-/* тарелка стоит «как после последнего вращения»: ложечка по центру сектора */
+/* тарелка стоит «как после последнего вращения»: стрелка по центру сектора */
 rot=-(Math.floor(Math.random()*SECTORS)*TAU + TAU/2);
 applyTheme();
 initAmbient();

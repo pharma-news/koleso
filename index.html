@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>Тарелка слов — крути, найди слово и расскажи, что оно значит</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%BD%EF%B8%8F%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=25">
+<link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
 
@@ -32,17 +32,17 @@
   <section class="dish-zone">
     <div class="stage">
       <div class="dish-frame" id="dish-frame">
-        <svg id="dish" viewBox="0 0 400 448" role="img" aria-label="Тарелка слов: двенадцать секторов со словами, сверху ложечка-защёлка"></svg>
+        <svg id="dish" viewBox="0 0 400 448" role="img" aria-label="Тарелка слов: двенадцать секторов со словами, сверху стрелка-указатель"></svg>
         <button class="dish-tap" id="dish-tap" aria-label="Крутить тарелку"></button>
       </div>
-    </div>
-
-    <div class="spin-row">
-      <button class="btn primary big" id="spin">🍽️ Крутить тарелку</button>
     </div>
   </section>
 
   <section class="result" id="result" aria-live="polite">
+    <div class="spin-row">
+      <button class="btn primary big" id="spin">🍽️ Крутить тарелку</button>
+    </div>
+
     <div class="word-card" id="word-card">
       <div class="word-kicker">Выпало слово</div>
       <div class="word" id="word">—</div>
@@ -54,6 +54,6 @@
   </section>
 </main>
 
-<script src="app.js?v=25"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>
