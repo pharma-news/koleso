@@ -73,15 +73,15 @@ main,header{position:relative; z-index:1}
       rgba(128,90,46,.01) 74%, rgba(128,90,46,0) 92%),
     linear-gradient(180deg, #1b1611 0%, #131009 40%, #0a0907 100%);
 }
-/* обои с росписью: узор виден только там, куда достаёт свет */
+/* обои: спокойная ромбовидная решётка с точками на стыках — как клеевая
+   бумага в старой комнате. Узор виден только там, куда достаёт свет,
+   и стоит неподвижно: дышащая маска перекрашивала бы слой каждый кадр */
 .amb-paper{
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23ffe6bd' stroke-opacity='.15' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M60 18c13 12 20 24 20 33 0 12-9 21-20 27-11-6-20-15-20-27 0-9 7-21 20-33z'/%3E%3Cpath d='M60 30c7 9 11 17 11 22 0 8-5 13-11 17-6-4-11-9-11-17 0-5 4-13 11-22z'/%3E%3Cpath d='M60 78v22M46 92c6-4 10-8 14-14M74 92c-6-4-10-8-14-14'/%3E%3Cpath d='M0 6c10 0 16 8 18 16M120 6c-10 0-16 8-18 16M0 114c10 0 16-8 18-16M120 114c-10 0-16-8-18-16'/%3E%3C/g%3E%3Cg fill='%23ffe6bd' fill-opacity='.18'%3E%3Ccircle cx='60' cy='52' r='2.2'/%3E%3Ccircle cx='0' cy='0' r='1.8'/%3E%3Ccircle cx='120' cy='0' r='1.8'/%3E%3Ccircle cx='0' cy='120' r='1.8'/%3E%3Ccircle cx='120' cy='120' r='1.8'/%3E%3Ccircle cx='30' cy='105' r='1.2'/%3E%3Ccircle cx='90' cy='105' r='1.2'/%3E%3C/g%3E%3C/svg%3E");
-  background-size:120px 120px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23ffe6bd' stroke-opacity='.13' stroke-width='1'%3E%3Cpath d='M36 0L72 36L36 72L0 36Z'/%3E%3Cpath d='M36 13L59 36L36 59L13 36Z' stroke-opacity='.07'/%3E%3C/g%3E%3Cg fill='%23ffe6bd'%3E%3Ccircle cx='36' cy='0' r='1.6' fill-opacity='.15'/%3E%3Ccircle cx='36' cy='72' r='1.6' fill-opacity='.15'/%3E%3Ccircle cx='0' cy='36' r='1.6' fill-opacity='.15'/%3E%3Ccircle cx='72' cy='36' r='1.6' fill-opacity='.15'/%3E%3Ccircle cx='36' cy='36' r='1' fill-opacity='.09'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:72px 72px;
   -webkit-mask-image:radial-gradient(80% 66% at 50% 20%, #000 0%, rgba(0,0,0,.85) 26%, rgba(0,0,0,.6) 46%, rgba(0,0,0,.34) 64%, rgba(0,0,0,.14) 80%, rgba(0,0,0,0) 94%);
           mask-image:radial-gradient(80% 66% at 50% 20%, #000 0%, rgba(0,0,0,.85) 26%, rgba(0,0,0,.6) 46%, rgba(0,0,0,.34) 64%, rgba(0,0,0,.14) 80%, rgba(0,0,0,0) 94%);
-  animation:paperBreath 24s ease-in-out infinite;
 }
-@keyframes paperBreath{0%,100%{opacity:.7} 50%{opacity:.95}}
 
 .amb-lamp{
   background:
@@ -96,12 +96,13 @@ main,header{position:relative; z-index:1}
 }
 @keyframes lampBreathe{0%,100%{opacity:.82; transform:scale(1)} 50%{opacity:1; transform:scale(1.06)}}
 body.lit .amb-lamp{filter:brightness(1.55) saturate(1.06)}
-/* мягкий конус света, который медленно качается, как качнувшаяся лампа */
+/* мягкий конус света, который медленно качается, как качнувшаяся лампа.
+   двигается только transform: он не перекрашивает слой, а значит почти бесплатен */
 .amb-lamp::after{content:''; position:absolute; left:-8%; top:-12%; width:58%; height:124%;
   background:linear-gradient(102deg, rgba(255,222,160,.10), rgba(255,222,160,0) 58%);
   animation:beamSway 26s ease-in-out infinite alternate}
-@keyframes beamSway{0%{opacity:.7; transform:translate3d(-2%,0,0) rotate(-4deg)}
-  100%{opacity:1; transform:translate3d(7%,1%,0) rotate(2deg)}}
+@keyframes beamSway{0%{transform:translate3d(-2%,0,0) rotate(-4deg)}
+  100%{transform:translate3d(7%,1%,0) rotate(2deg)}}
 
 .amb-drift{
   background:
@@ -115,16 +116,22 @@ body.lit .amb-lamp{filter:brightness(1.55) saturate(1.06)}
 }
 @keyframes ambDrift{0%{transform:translate3d(-4%,-2%,0) scale(1.06)} 100%{transform:translate3d(5%,3%,0) scale(1.14)}}
 
-/* объёмные лучи: два столба света, в которых ходит пыль */
-.amb-rays{mix-blend-mode:screen; opacity:.8; filter:blur(16px); transition:opacity .6s ease}
+/* объёмные лучи: два столба света, в которых ходит пыль.
+   мягкость даёт сам градиент: blur() по всему экрану — самая дорогая вещь
+   в таком фоне, на слабом ноутбуке именно он и тормозит. Здесь его нет. */
+.amb-rays{opacity:.85; transition:opacity .6s ease}
 .amb-rays::before, .amb-rays::after{content:''; position:absolute; top:-26%; height:158%;
-  background:linear-gradient(97deg, rgba(255,228,174,0) 0%, rgba(255,228,174,.18) 44%, rgba(255,228,174,0) 88%)}
-.amb-rays::before{left:-4%; width:36%; animation:shaftA 21s ease-in-out infinite alternate}
-.amb-rays::after{left:56%; width:22%; opacity:.7; animation:shaftB 29s ease-in-out infinite alternate}
-@keyframes shaftA{0%{transform:rotate(11deg) translate3d(-3%,0,0); opacity:.55}
-  100%{transform:rotate(16deg) translate3d(4%,1%,0); opacity:1}}
-@keyframes shaftB{0%{transform:rotate(-13deg) translate3d(3%,0,0); opacity:.9}
-  100%{transform:rotate(-8deg) translate3d(-4%,1%,0); opacity:.45}}
+  will-change:transform;
+  background:linear-gradient(97deg,
+    rgba(255,228,174,0) 0%, rgba(255,228,174,.04) 20%, rgba(255,228,174,.10) 42%,
+    rgba(255,228,174,.13) 54%, rgba(255,228,174,.07) 70%, rgba(255,228,174,.018) 84%,
+    rgba(255,228,174,0) 96%)}
+.amb-rays::before{left:-6%; width:44%; animation:shaftA 21s ease-in-out infinite alternate}
+.amb-rays::after{left:52%; width:30%; opacity:.75; animation:shaftB 29s ease-in-out infinite alternate}
+@keyframes shaftA{0%{transform:translate3d(-3%,0,0) rotate(11deg)}
+  100%{transform:translate3d(4%,1%,0) rotate(16deg)}}
+@keyframes shaftB{0%{transform:translate3d(3%,0,0) rotate(-13deg)}
+  100%{transform:translate3d(-4%,1%,0) rotate(-8deg)}}
 body.lit .amb-rays{opacity:1}
 
 /* дымка, боке и пылинки трёх глубин — рисует ambient.js.
@@ -170,7 +177,7 @@ html[data-theme=light] .amb-wall{
     linear-gradient(180deg, #fbf6ea 0%, #f2ead9 52%, #e6dcc8 100%);
 }
 html[data-theme=light] .amb-paper{
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%238a6f3e' stroke-opacity='.3' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M60 18c13 12 20 24 20 33 0 12-9 21-20 27-11-6-20-15-20-27 0-9 7-21 20-33z'/%3E%3Cpath d='M60 30c7 9 11 17 11 22 0 8-5 13-11 17-6-4-11-9-11-17 0-5 4-13 11-22z'/%3E%3Cpath d='M60 78v22M46 92c6-4 10-8 14-14M74 92c-6-4-10-8-14-14'/%3E%3Cpath d='M0 6c10 0 16 8 18 16M120 6c-10 0-16 8-18 16M0 114c10 0 16-8 18-16M120 114c-10 0-16-8-18-16'/%3E%3C/g%3E%3Cg fill='%238a6f3e' fill-opacity='.26'%3E%3Ccircle cx='60' cy='52' r='2.2'/%3E%3Ccircle cx='0' cy='0' r='1.8'/%3E%3Ccircle cx='120' cy='0' r='1.8'/%3E%3Ccircle cx='0' cy='120' r='1.8'/%3E%3Ccircle cx='120' cy='120' r='1.8'/%3E%3Ccircle cx='30' cy='105' r='1.2'/%3E%3Ccircle cx='90' cy='105' r='1.2'/%3E%3C/g%3E%3C/svg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%238a6f3e' stroke-opacity='.26' stroke-width='1'%3E%3Cpath d='M36 0L72 36L36 72L0 36Z'/%3E%3Cpath d='M36 13L59 36L36 59L13 36Z' stroke-opacity='.14'/%3E%3C/g%3E%3Cg fill='%238a6f3e'%3E%3Ccircle cx='36' cy='0' r='1.6' fill-opacity='.3'/%3E%3Ccircle cx='36' cy='72' r='1.6' fill-opacity='.3'/%3E%3Ccircle cx='0' cy='36' r='1.6' fill-opacity='.3'/%3E%3Ccircle cx='72' cy='36' r='1.6' fill-opacity='.3'/%3E%3Ccircle cx='36' cy='36' r='1' fill-opacity='.18'/%3E%3C/g%3E%3C/svg%3E");
   -webkit-mask-image:radial-gradient(84% 70% at 50% 18%, #000 0%, rgba(0,0,0,.8) 28%, rgba(0,0,0,.55) 48%, rgba(0,0,0,.3) 66%, rgba(0,0,0,.12) 82%, rgba(0,0,0,0) 96%);
           mask-image:radial-gradient(84% 70% at 50% 18%, #000 0%, rgba(0,0,0,.8) 28%, rgba(0,0,0,.55) 48%, rgba(0,0,0,.3) 66%, rgba(0,0,0,.12) 82%, rgba(0,0,0,0) 96%);
 }
@@ -180,10 +187,13 @@ html[data-theme=light] .amb-lamp{
     radial-gradient(84% 56% at 50% 16%, rgba(255,246,222,.5), rgba(255,246,222,.18) 46%, rgba(255,246,222,0) 90%);
 }
 html[data-theme=light] .amb-lamp::after{background:linear-gradient(102deg, rgba(255,246,220,.72), rgba(255,246,220,0) 60%)}
-html[data-theme=light] .amb-rays{opacity:.16; filter:blur(22px)}
+html[data-theme=light] .amb-rays{opacity:.22}
 html[data-theme=light] .amb-rays::before,
 html[data-theme=light] .amb-rays::after{
-  background:linear-gradient(97deg, rgba(255,250,236,0) 0%, rgba(255,250,236,.55) 44%, rgba(255,250,236,0) 88%)}
+  background:linear-gradient(97deg,
+    rgba(255,250,236,0) 0%, rgba(255,250,236,.16) 22%, rgba(255,250,236,.42) 44%,
+    rgba(255,250,236,.5) 54%, rgba(255,250,236,.26) 70%, rgba(255,250,236,.06) 84%,
+    rgba(255,250,236,0) 96%)}
 html[data-theme=light] .amb-drift{
   background:
     radial-gradient(38% 34% at 16% 20%, rgba(255,238,206,.75), rgba(255,238,206,.34) 44%, transparent 84%),
@@ -202,10 +212,26 @@ html[data-theme=light] .amb-vignette{
 }
 html[data-theme=light] .amb-grain{opacity:.05; mix-blend-mode:multiply}
 @media (prefers-reduced-motion: reduce){
-  .amb-lamp,.amb-drift,.amb-lamp::after,.amb-paper,.amb-floor,.amb-vignette,
+  .amb-lamp,.amb-drift,.amb-lamp::after,.amb-floor,.amb-vignette,
   .amb-rays::before,.amb-rays::after{animation:none}
   .ambient{transition:none}
 }
+
+/* --------------------------- слабый ноутбук ---------------------------
+   ambient.js сам решает, сколько себе позволить, и вешает на body класс
+   amb-low / amb-med / amb-high (можно задать руками: ?amb=off|low|med|high).
+   На низком уровне из фона уходит всё дорогое: размытие под шапкой и
+   карточкой, смешивание зерна, фильтр яркости и дышащие перекраски слоёв.
+   Остаётся свет, обои и спокойная пыль — дёшево и неподвижно по цене кадра. */
+body.amb-low .amb-lamp, body.amb-low .amb-drift, body.amb-low .amb-floor,
+body.amb-low .amb-vignette, body.amb-low .amb-lamp::after,
+body.amb-low .amb-rays::before, body.amb-low .amb-rays::after{animation:none}
+body.amb-low .amb-lamp, body.amb-low .amb-rays, body.amb-low .amb-floor{transition:none}
+body.amb-low.lit .amb-lamp, body.amb-low.lit .amb-floor, body.amb-low.lit .amb-vignette{filter:none}
+body.amb-low .amb-grain{mix-blend-mode:normal; opacity:.035}
+body.amb-low .topbar{backdrop-filter:none; -webkit-backdrop-filter:none}
+body.amb-low .word-card{backdrop-filter:none; -webkit-backdrop-filter:none}
+body.amb-off .ambient{display:none}
 
 /* --------------------------- шапка --------------------------- */
 .topbar{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
@@ -215,8 +241,11 @@ html[data-theme=light] .amb-grain{opacity:.05; mix-blend-mode:multiply}
 @supports (background:color-mix(in srgb, red 50%, transparent)){
   .topbar{background:color-mix(in srgb, var(--bg-2) 70%, transparent);
     backdrop-filter:blur(9px) saturate(1.15); -webkit-backdrop-filter:blur(9px) saturate(1.15)}
-  /* карточка со словом тоже чуть прозрачна: тёплый свет проходит сквозь неё */
+  /* карточка со словом тоже чуть прозрачна: тёплый свет проходит сквозь неё.
+     днём — почти плотная: на креме полупрозрачная карточка теряет контраст */
   .word-card{background:color-mix(in srgb, var(--card) 88%, transparent); backdrop-filter:blur(6px)}
+  html[data-theme=light] .word-card{background:color-mix(in srgb, var(--card) 97%, transparent);
+    backdrop-filter:none; -webkit-backdrop-filter:none}
 }
 .brand{display:flex; align-items:center; gap:11px}
 .brand .logo{font-size:1.6rem}

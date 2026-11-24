@@ -26,7 +26,7 @@ const PAL={
 };
 
 let cv=null, ctx=null, W=0, H=0, dpr=1, oX=0, oY=0;
-let raf=null, last=0, clock=0, ema=16, trim=0;
+let raf=null, last=0, clock=0, ema=16, acc=0;
 let reduced=false, hidden=false;
 let kSpin=0, kWant=0;                    /* скорость тарелки: цель и текущая */
 let pX=0, pY=0, pXT=0, pYT=0;            /* параллакс: текущий и цель */
@@ -34,6 +34,48 @@ let warm=0;                              /* тёплая вспышка: сел�
 let sp=null;                             /* спрайты текущей темы */
 let haze=[], motes=[], bokeh=[], sparks=[], waves=[];
 let dish={x:-1e4, y:-1e4, r:0};          /* центр тарелки в координатах холста */
+
+/* ------------------------------ уровни качества ------------------------------
+   На слабом ноутбуке фон не имеет права отъедать кадры, поэтому он умеет
+   сам себя урезать: меньше пикселей холста, меньше пыли, меньше дымок.
+   Уровень выбирается при старте по железу, а потом подправляется по тому,
+   как идут кадры. Ручной выбор: ?amb=off|low|med|high                          */
+const TIERS=[
+  { name:'low',  dpr:1,    moteK:.32, haze:3, bokeh:0, sparkK:.45, hazeK:.72 },
+  { name:'med',  dpr:1.25, moteK:.68, haze:4, bokeh:5, sparkK:1,   hazeK:.86 },
+  { name:'high', dpr:1.7,  moteK:1,   haze:5, bokeh:8, sparkK:1,   hazeK:1 }
+];
+let tier=1, tierTop=1, calm=0;           /* текущий и верхний допустимый уровни */
+function Q(){ return TIERS[tier]; }
+
+function pickTier(){
+  let want=null;
+  try{ want = new URLSearchParams(location.search).get('amb'); }catch(e){}
+  if(want==='off' || want==='0' || want==='none') return -1;
+  const i = TIERS.findIndex(t=>t.name===want);
+  if(i>=0) return i;
+  const cores = navigator.hardwareConcurrency || 4;
+  const mem   = navigator.deviceMemory || 4;
+  const huge  = (window.innerWidth*window.innerHeight) > 2600000;
+  if(cores<=2 || mem<=2) return 0;
+  if(cores<=4 || mem<=4 || huge) return 1;
+  return 2;
+}
+/* сменить уровень: холст пересевается заново, класс на body tells CSS */
+function setTier(next){
+  next = clamp(next, 0, TIERS.length-1);
+  if(next===tier) return;
+  tier=next;
+  markBody();
+  rebuild();
+}
+function markBody(){
+  const b=document.body;
+  if(!b) return;
+  b.classList.toggle('amb-low',  tier===0);
+  b.classList.toggle('amb-med',  tier===1);
+  b.classList.toggle('amb-high', tier===2);
+}
 
 /* ------------------------------ спрайты ------------------------------ */
 /* Мягкое пятно: stops — [доля радиуса, альфа]. Цвет задаётся группой PAL,
@@ -50,10 +92,10 @@ function softSprite(rgb, stops, size){
 function buildSprites(){
   const P=PAL[current()];
   sp={
-    haze : softSprite(P.haze , [[0,.9],[.2,.7],[.4,.45],[.6,.24],[.78,.1],[.9,.03],[1,0]], 512),
-    mote : softSprite(P.mote , [[0,1],[.14,.82],[.3,.34],[.62,.08],[1,0]], 64),
-    bokeh: softSprite(P.bokeh, [[0,.55],[.42,.5],[.62,.3],[.86,.12],[1,0]], 128),
-    spark: softSprite(P.spark, [[0,1],[.2,.7],[.5,.18],[1,0]], 48),
+    haze : softSprite(P.haze , [[0,.9],[.2,.7],[.4,.45],[.6,.24],[.78,.1],[.9,.03],[1,0]], 256),
+    mote : softSprite(P.mote , [[0,1],[.14,.82],[.3,.34],[.62,.08],[1,0]], 48),
+    bokeh: softSprite(P.bokeh, [[0,.55],[.42,.5],[.62,.3],[.86,.12],[1,0]], 96),
+    spark: softSprite(P.spark, [[0,1],[.2,.7],[.5,.18],[1,0]], 40),
     wave : softSprite(P.wave , [[0,0],[.52,0],[.72,.55],[.84,.85],[.93,.25],[1,0]], 256)
   };
 }
@@ -67,28 +109,32 @@ function rebuild(){
   const r=cv.getBoundingClientRect();
   W=Math.max(280, r.width); H=Math.max(280, r.height);
   oX=r.left; oY=r.top;
-  dpr=Math.min(1.75, window.devicePixelRatio||1);
+  /* чем больше экран, тем дешевле пиксель: полный dpr на большом мониторе
+     стоил бы фонаря дороже, чем сама тарелка */
+  const area=W*H, soft = area>2200000? .68 : (area>1200000? .85 : 1);
+  dpr=Math.min(Q().dpr*soft, window.devicePixelRatio||1);
   cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
   seed();
 }
-/* количество пылинок — по площади экрана, с потолком: на 4K не раздувать фон */
+/* количество пылинок — по площади экрана и по уровню качества */
 function moteCount(){
-  return Math.round(clamp(W*H/13000, 34, 122));
+  return Math.max(10, Math.round(clamp(W*H/13000, 34, 122)*Q().moteK));
 }
 function seed(){
   haze=[]; bokeh=[]; sparks=[]; waves=[]; motes=[];
-  const dark=current()==='dark';
-  /* дымка: пять пятен, два из них вытянутые — похоже на пряди дыма */
-  for(let i=0;i<5;i++){
-    const big=Math.min(W,H);
+  const dark=current()==='dark', q=Q();
+  /* дымка: пятна света, два из них вытянутые — похоже на пряди дыма.
+     радиус ограничен: пятно во весь экран стоит дороже всей пыли вместе */
+  const big=Math.min(W,H)*q.hazeK;
+  for(let i=0;i<q.haze;i++){
     haze.push({ x:rnd(-.1,1.1)*W, y:rnd(-.05,1.05)*H,
-      rx:rnd(.22,.5)*big, ry:rnd(.18,.42)*big*(i<2?1.9:1),
+      rx:rnd(.2,.42)*big, ry:rnd(.16,.34)*big*(i<2?1.9:1),
       vx:rnd(-4.5,4.5), vy:rnd(-3,3), ph:rnd(0,TAU), sp:rnd(.05,.16),
       a:rnd(.5,1), z:rnd(.25,.7), tilt:rnd(-.5,.5) });
   }
   /* боке — ближе всех к зрителю, потому сильнее тянется за курсором */
-  for(let i=0;i<8;i++){
+  for(let i=0;i<q.bokeh;i++){
     bokeh.push({ x:rnd(0,1)*W, y:rnd(0,1)*H, r:rnd(12,46),
       vx:rnd(-5,5), vy:rnd(-4,4), a:rnd(.07,dark?.2:.1), ph:rnd(0,TAU), sp:rnd(.08,.22) });
   }
@@ -226,10 +272,17 @@ function tick(now){
   const raw=(now-last)||16; last=now;
   const dt=Math.min(50, raw)/1000;
   clock+=dt;
-  /* если машина не справляется — чуть меньше пылинок: картинка от этого не портится */
+  /* фон подстраивается сам: кадры просели — сразу уровень ниже;
+     шёл легко шесть секунд — один раз можно вернуть уровень обратно */
   ema += (raw-ema)*0.06;
-  if(ema>42 && motes.length>26){ motes.length=Math.round(motes.length*0.9); ema=22; }
-  step(dt); draw();
+  if(ema>34 && tier>0){ setTier(tier-1); ema=18; calm=0; }
+  else if(ema<11){ calm+=dt; if(calm>6 && tier<tierTop){ setTier(tier+1); calm=0; ema=16; } }
+  else if(ema>20) calm=0;
+  /* на низком уровне рисуем в ~30 к/с: движение медленное, глазу хватит,
+     а половина растра остаётся системе */
+  let sdt=dt;
+  if(tier===0){ acc+=dt; if(acc<1/30) return; sdt=acc; acc=0; }
+  step(sdt); draw();
 }
 function start(){
   if(raf || !cv) return;
@@ -247,6 +300,9 @@ const AMB=window.AMB={
   /* повесить движок на canvas; вызывается один раз при старте страницы */
   mount(el){
     if(!el || !el.getContext) return;
+    const t=pickTier();
+    if(t<0){ document.body.classList.add('amb-off'); return; }   /* ?amb=off — фона нет вовсе */
+    tier=t; tierTop=t; markBody();
     cv=el; ctx=cv.getContext('2d');
     reduced = reducedMotion();
     buildSprites(); rebuild();
@@ -281,10 +337,10 @@ const AMB=window.AMB={
   /* искры от храповика: экраные координаты точки удара */
   spark(x, y, n, scale){
     if(reduced || !sp) return;
-    const s=Math.max(0.2, scale||1);
+    const s=Math.max(0.2, scale||1), k=Q().sparkK;
     const X=x-oX, Y=y-oY;
-    const room=140-sparks.length;
-    for(let i=0;i<Math.min(n, room);i++){
+    const room=Math.round(140*k)-sparks.length;
+    for(let i=0;i<Math.min(Math.ceil(n*k), room);i++){
       sparks.push({ x:X+rnd(-5,5)*s, y:Y+rnd(-4,4)*s,
         vx:rnd(40,240)*s*(Math.random()<0.22?-1:1), vy:rnd(-190,-20)*s,
         age:0, life:rnd(.32,.75), r:rnd(.8,2.1)*s });
@@ -304,7 +360,12 @@ const AMB=window.AMB={
     warm=Math.min(1.1, warm + (power||1));
     if(reduced) still();
   },
-  retheme(){ if(!sp) return; buildSprites(); if(reduced) still(); }
+  retheme(){ if(!sp) return; buildSprites(); if(reduced) still(); },
+  /* для проверки руками: какой уровень взял фон и сколько он рисует */
+  stats(){ return { tier:TIERS[tier].name, top:TIERS[tierTop].name, ms:+ema.toFixed(1),
+                    dpr:+dpr.toFixed(2), motes:motes.length, haze:haze.length,
+                    bokeh:bokeh.length, sparks:sparks.length }; },
+  quality(name){ const i=TIERS.findIndex(t=>t.name===name); if(i>=0){ tierTop=i; setTier(i); } }
 };
 function reducedMotion(){
   try{ return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
