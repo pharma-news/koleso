@@ -15,7 +15,10 @@
    Что звучит:
       · храповик — золотая точка борта звякает СВОЕЙ нотой: у каждого
         из 12 секторов своя нота, и один оборот тарелки проигрывает
-        мелодию-фразу, которая ладно закольцована. Нота — маримбовая:
+        мелодию-фразу, которая ладно закольцована. Каждое вращение берёт свою
+         вариацию фразы (мотив, тот же мотив на ступень выше, спуск к
+         основе), а на полном ходу, когда ноты идут часто, тарелка
+         играет трезвучие тоники — ясное арпеджио вместо каши. Нота — маримбовая:
         основной тон, октава, квинта-подмешка на быстром ходу, тонкая
         стеклянная атака борта. На разгоне ноты короткие и частые —
         получается арпеджио; на торможении они длиннее и распеваются;
@@ -24,7 +27,7 @@
         портаменто), над ним чистая квинта и октава, внизу тёплая
         подкладка. Тремоло = круг тарелки;
       · фарфор — звон тарелки настроен: несовершенные обертоны
-        заменены на благозвучный ряд (тон, квинта, октава, дуodeцима),
+        заменены на благозвучный ряд (тон, квинта, октава, дуодецима),
         как у поющей чаши, с лёгким биением двух близко настроенных
         голосов;
       · побег: соскок со штырька, свист падения глиссандо на квинту
@@ -63,16 +66,76 @@ function saveCfg(){ try{ localStorage.setItem(SET_KEY, JSON.stringify(cfg)); }ca
    Пентатоника до-мажора: 0, 2, 4, 7, 9 полутонов от тоники. */
 const hz=(midi)=>440*Math.pow(2, (midi-69)/12);
 const PENT=[0,2,4,7,9];
-/* мелодия одного оборота: по ноте на каждый из 12 секторов.
-   Фраза кончается так, что ладно переходит в своё начало. */
-const MELODY=[72, 79, 81, 76, 79, 84, 81, 79, 76, 74, 76, 79];
+/* Мелодия одного оборота: по ноте на каждый из 12 секторов. Она не
+   случайный набор звуков, а построенная фраза: мотив A, тот же мотив
+   на ступень выше A', и спуск к основе — фраза разрешается и ладно
+   переходит в своё начало на следующем круге. Каждое вращение
+   получает свою вариацию (мотив, основа и сдвиг A' выбираются наугад),
+   но всегда в том же ладу и регистре, поэтому любая вариация звучит
+   красиво и на полном ходу, и на последнем. Ступени лада считаются
+   числами 0..8: 0 — до первой, 8 — соль второй. */
+const MOTIFS=[[0,2,4,2],[0,4,3,1],[0,3,4,2],[0,1,2,1],[0,2,0],[0,3,1,2],[0,2,4,5,3],[0,4,2,1]];
+const PH_OFF=[1,2,-3];             /* A': на ступень выше, на две, или чуть ниже */
+const D_LO=0, D_HI=8;              /* регистр фразы */
+const degMidi=(d)=>{ const dd=clamp(d|0, D_LO, D_HI); return 72+12*Math.floor(dd/5)+PENT[dd%5]; };
+function buildPhrase(mi, base, off){
+  const m=MOTIFS[((mi%MOTIFS.length)+MOTIFS.length)%MOTIFS.length];
+  const d=[], add=(o)=>{ for(const s of m) d.push(clamp(base+o+s, D_LO, D_HI)); };
+  add(0); add(off);
+  const need=Math.max(0, 12-d.length);
+  let cur=d[d.length-1];                           /* спуск идём от последней ноты,
+                                                      чтобы прыжков через полторы октавы не было */
+  for(let i=0;i<need;i++){
+    const prev=d[d.length-1];
+    if(i===need-1) cur=(prev===base)? base+3 : base;   /* разрешение: в тонику, а если она уже
+                                                          звучит — в квинту над ней */
+    else cur=(cur>base? cur-1 : cur+1);
+    d.push(clamp(cur, D_LO, D_HI));
+  }
+  return d.slice(0,12);
+}
+const pick=(a)=>a[Math.floor(Math.random()*a.length)];
+/* варианты перебираем только те, что не упираются в край регистра
+   (иначе ноты повторяются и фраза буксует) и где стык A и A' не скачет
+   больше чем на четыре ступени */
+const BASES=[0,1,2,3,4];
+const phraseChoices=(mi)=>{
+  const m=MOTIFS[mi], hi=Math.max.apply(null, m);
+  const b=BASES.filter(x=>x+hi<=D_HI);
+  const out=[];
+  for(let i=0;i<b.length;i++){
+    const offs=PH_OFF.filter(o=>b[i]+o>=D_LO && b[i]+o+hi<=D_HI &&
+                                Math.abs(o+m[0]-m[m.length-1])<=4);
+    if(offs.length) out.push({base:b[i], offs:offs});
+  }
+  return out;
+};
+const pickPhraseIndex=()=>{
+  const good=[];
+  for(let mi=0;mi<MOTIFS.length;mi++) if(phraseChoices(mi).length) good.push(mi);
+  return pick(good);
+};
+const randomPhrase=()=>{
+  const mi=pickPhraseIndex(), ch=pick(phraseChoices(mi));
+  return buildPhrase(mi, ch.base, pick(ch.offs));
+};
+const DEFAULT_PHRASE=buildPhrase(0, 0, 1);
+let PHRASE=DEFAULT_PHRASE.slice();
+/* тоника лада — до; на полном ходу тарелка играет её трезвучие, чтобы
+   частые ноты не сливались, а складывались в ясное арпеджио */
 const ROOT=60;                    /* тоника — до первой октавы */
+const CORE=[60, 64, 67, 72, 76, 79, 84];
 const BASS_SEQ=[55, 48, 52, 55];  /* соль-до-ми-соль: настройка перестука и посадок */
+function coreNear(m){
+  let best=CORE[0], bd=1e9;
+  for(let i=0;i<CORE.length;i++){ const d=Math.abs(CORE[i]-m); if(d<bd){ bd=d; best=CORE[i]; } }
+  return best;
+}
 
 function midiOf(sector){
-  const n=MELODY.length;
+  const n=PHRASE.length;
   const i=((sector%n)+n)%n;
-  return MELODY[i];
+  return degMidi(PHRASE[i]);
 }
 /* ближайшая нота пентатоники к произвольной частоте — чтобы любые
    «не музыкальные» вызовы (свист, перестук) попадали в лад */
@@ -126,7 +189,7 @@ function makeEngine(ac){
   const lowShelf=ac.createBiquadFilter(); lowShelf.type='lowshelf'; lowShelf.frequency.value=240; lowShelf.gain.value=1.8;
   const hiShelf=ac.createBiquadFilter(); hiShelf.type='highshelf'; hiShelf.frequency.value=7200; hiShelf.gain.value=-3.5;
   const lim=ac.createDynamicsCompressor();
-  lim.threshold.value=-9; lim.knee.value=6; lim.ratio.value=6;
+  lim.threshold.value=-12; lim.knee.value=8; lim.ratio.value=8;
   lim.attack.value=0.003; lim.release.value=0.32;
   master.connect(lowShelf); lowShelf.connect(hiShelf); hiShelf.connect(lim); lim.connect(ac.destination);
   const tap=ac.createAnalyser(); tap.fftSize=1024; tap.smoothingTimeConstant=0.55;
@@ -170,7 +233,7 @@ function makeEngine(ac){
       на мастер-шине: ни один звук не должен резать (клиппинг) и не должен
       быть тише шёпота. */
   const MIX={
-    click: 3.1,    /* храповик: золотая точка звенит своей нотой */
+    click: 2.9,    /* храповик: золотая точка звенит своей нотой */
     air:   2.0,    /* поющий гул тарелки на штырьке */
     roll:  1.0,    /* качение тарелки по полу */
     hit:   4.2,    /* фарфор и литавры: пуск, удары, звон, посадка */
@@ -272,8 +335,12 @@ function makeEngine(ac){
     lastClick=t;
     const s=(sector==null? clickI++ : sector);
     clickI=s+1;
-    const midi=midiOf(s), f=hz(midi)*rnd(0.9995,1.0005);
-    const k=clamp(vn,0,1.3), mn=Math.min(1,k);
+    const midi=midiOf(s), k=clamp(vn,0,1.3), mn=Math.min(1,k);
+    /* на полном ходу ноты частые, и полная фраза слилась бы в кашу:
+       там тарелка играет трезвучие тоники — ясное арпеджио.
+       Чуть замедлилась — зазвучала вся фраза целиком */
+    const play=(mn>0.8? coreNear(midi) : midi);
+    const f=hz(play)*rnd(0.9995,1.0005);
     const amp=0.045+0.20*Math.min(1.05,k);
     /* на медленном ходу нота распевается длиннее, на быстром — короткая,
        иначе на 35 щелчках в секунду выйдет каша вместо арпеджио */
@@ -293,7 +360,7 @@ function makeEngine(ac){
     env(g,t, 0.010+0.024*mn, 0.0006, 0.013);
     s2.start(t, rnd(0,1.4)); s2.stop(t+0.08);
     /* гул тарелки тянется за мелодией */
-    followHum(midi);
+    followHum(play);
   };
 
   /* ---------------- голос вращения: тарелка поёт на штырьке ----------------
@@ -356,6 +423,18 @@ function makeEngine(ac){
   /* оседаем в тонику: тарелка замирает настроенной */
   E.restHum=function(){ humMidi=ROOT; humSet(ROOT, 0.5); };
 
+  /* ---------------- мелодия вращения ----------------
+      Каждое вращение — своя вариация фразы: новый мотив, другая основа,
+      другой сдвиг второй копии мотива. Колокольчик выпавшего слова
+      берёт ноту из ЭТОЙ же фразы, так что слово всегда «допевает» то,
+      что тарелка спела на его секторе. */
+  E.newPhrase=function(){
+    PHRASE=randomPhrase();
+    return PHRASE.map(degMidi);
+  };
+  E.setPhrase=function(p){ PHRASE=p.slice(0,12); return PHRASE.map(degMidi); };
+  E.phrase=function(){ return PHRASE.map(degMidi); };
+
   /* ---------------- качение: перестук, настроенный в аккорд ---------------- */
   const rollSrc=nz(); rollSrc.loop=true;
   const rollLp=filt('lowpass', 300, 0.8), rollAm=gn(1), rollG=gn(0);
@@ -394,7 +473,7 @@ function makeEngine(ac){
     const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(f0*1.08,t);
     o.frequency.exponentialRampToValueAtTime(f0, t+0.05);          /* мягко допевает в ноту */
     const g=gn(0); o.connect(g); g.connect(E.hitBus);
-    env(g,t, amp, 0.003, 0.17); o.start(t); o.stop(t+0.36);
+    env(g,t, amp, 0.003, 0.24); o.start(t); o.stop(t+0.45);
     tone(t, f0*2, amp*0.28, 0.003, 0.1, E.hitBus, 'sine');
     const s=nz(), lp=filt('lowpass', 750, 0.8), sg=gn(0);
     s.connect(lp); lp.connect(sg); sg.connect(E.hitBus);
@@ -595,6 +674,7 @@ function makeEngine(ac){
   };
   E.spinStart=function(power){
     const t=T(), p=clamp(power,0.1,1);
+    E.newPhrase();                                 /* новое вращение — новая вариация фразы */
     E.flick(p, t);                                 /* палец соскочил с борта */
     E.ringPlate(0.65*p, t+0.015, ROOT+12);
     /* тарелка трогается: гул поднимается на квинту вместе с первым кругом */
@@ -758,14 +838,16 @@ const SFX={
       ожидаемой ноте с энергией на ноте, отстоящей на 100 центов. Если
       звук настроен — отношение большое; если фальшивит, оно около единицы. */
   tuningTest:function(){
+    const D=DEFAULT_PHRASE.map(degMidi);
+    const pin=(e)=>e.setPhrase(DEFAULT_PHRASE);
     const want={
-      click0:  {e:e=>e.click(0.5, 0),   at:[72],          tail:[0.02,0.22]},
-      click5:  {e:e=>e.click(0.5, 5),   at:[84],          tail:[0.02,0.22]},
-      click9:  {e:e=>e.click(0.5, 9),   at:[74],          tail:[0.02,0.22]},
-      reveal7: {e:e=>e.reveal(7),       at:[79,86,91],    tail:[0.05,0.35]},
-      reveal2: {e:e=>e.reveal(2),       at:[81,88,93],    tail:[0.05,0.35]},
+      click0:  {e:e=>{ pin(e); e.click(0.5, 0); },   at:[D[0]],          tail:[0.02,0.22]},
+      click5:  {e:e=>{ pin(e); e.click(0.5, 5); },   at:[D[5]],          tail:[0.02,0.22]},
+      click9:  {e:e=>{ pin(e); e.click(0.5, 9); },   at:[D[9]],          tail:[0.02,0.22]},
+      reveal7: {e:e=>{ pin(e); e.reveal(7); },       at:[D[7],D[7]+7,D[7]+12], tail:[0.05,0.35]},
+      reveal2: {e:e=>{ pin(e); e.reveal(2); },       at:[D[2],D[2]+7,D[2]+12], tail:[0.05,0.35]},
       plate:   {e:e=>e.ringPlate(0.6),  at:[60,67,72,79], tail:[0.05,0.60]},
-      thump:   {e:e=>e.thump(0.2, 120), at:[48],          tail:[0.06,0.16]},
+      thump:   {e:e=>e.thump(0.2, 120), at:[48],          tail:[0.06,0.20]},
       hum:     {e:e=>{ e.setSpeed(1); e.setSpeed(1); },   at:[60,67,72], tail:[0.60,1.60]},
       fanfare: {e:e=>e.fanfare(),       at:[72,76,79,84], tail:[0.98,1.30]}
     };
@@ -812,6 +894,38 @@ const SFX={
               clicks:clicks, scaleRatio:+(avg(IN.map(f=>bandEnergy(r.buf,r.rate,f,0.3,8)))/
                                           avg(OUT.map(f=>bandEnergy(r.buf,r.rate,f,0.3,8)))).toFixed(2)};
     });
+  },
+
+  /* мелодия: генератор вариаций обязан держаться лада, регистра и
+      умеренных прыжков — иначе «красиво всегда» не выйдет. Прогоняем
+      несколько сотен вариаций и считаем нарушения. */
+  phraseTest:function(){
+    const PC=[0,2,4,7,9], T=400;
+    let bad=0, maxJump=0, loopJump=0, triple=0; const seen=new Set();
+    for(let k=0;k<T;k++){
+      const p=randomPhrase();
+      const m=p.map(degMidi);
+      seen.add(m.join(','));
+      if(m.length!==12){ bad++; continue; }
+      for(let i=0;i<12;i++){
+        if(m[i]<72 || m[i]>91 || PC.indexOf(m[i]%12)<0){ bad++; break; }
+      }
+      for(let i=0;i<11;i++) maxJump=Math.max(maxJump, Math.abs(m[i+1]-m[i]));
+      for(let i=2;i<12;i++) if(m[i]===m[i-1] && m[i-1]===m[i-2]) triple++;
+      loopJump=Math.max(loopJump, Math.abs(m[0]-m[11]));
+    }
+    return {tries:T, bad:bad, distinct:seen.size, maxJump:maxJump, loopJump:loopJump, tripleRun:triple};
+  },
+
+  /* что играется прямо сейчас (ноты текущей вариации фразы) */
+  phrase:function(){ return E? E.phrase() : PHRASE.map(degMidi); },
+
+  /* несколько вариаций подряд — посмотреть глазами, что генератор
+      выдаёт фразы, а не набор звуков */
+  phrases:function(n){
+    const out=[];
+    for(let k=0;k<(n||6);k++) out.push(randomPhrase().map(degMidi));
+    return out;
   }
 };
 
