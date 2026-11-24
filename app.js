@@ -10,6 +10,11 @@
 const WORDS=['Бумага','Арена','Награда','Чемодан','Маскарад','Ураган','Радуга','Мешок','Басня','Лагерь','Договор','Обычай'];
 const SECTORS=WORDS.length, TAU=360/SECTORS;
 const CX=200, CY=196;              /* центр тарелки в единицах viewBox */
+/* рамка вида: сверху оставлено поле под доску-стойку со стрелкой,
+   поэтому viewBox начинается не с нуля. ширина рамки осталась 400 —
+   значит тарелка на экране не изменилась в размере */
+const VB={x:0, y:-56, w:400, h:504};
+
 const DISH_R=190;                  /* внешний край: большая тарелка занимает почти весь кадр */
 const R=154;                       /* расписное поле, остальное — широкий чистый борт */
 const RIM_MID=(DISH_R+R)/2;        /* середина широкого борта тарелки */
@@ -17,7 +22,8 @@ const DOT_R=170;                   /* золотые точки по борту 
 const WELL=60;                     /* неглубокая фарфоровая пипка в середине тарелки */
 const TILE_OUT=148, TILE_IN=64, TILE_H=26; /* плашки со словами: вдоль радиуса, читаются вниз к центру */
 const ROMAN_R=51;                  /* римские номера секторов */
-const PIVOT_X=200, PIVOT_Y=6;      /* ось стрелки-указателя */
+const PIVOT_X=200, PIVOT_Y=VB.y+16;  /* ось стрелки — в шляпке на верхнем конце доски */
+
 const KEY='tarelka_v1', OLD_KEY='koleso_v1';
 const SVGNS='http://www.w3.org/2000/svg';
 
@@ -95,6 +101,7 @@ function labelText(w){ return w.length>11 ? w.slice(0,10)+'…' : w; }
 function buildDish(){
   const svg=$('#dish');
   svg.innerHTML='';
+  svg.setAttribute('viewBox', VB.x+' '+VB.y+' '+VB.w+' '+VB.h);
 
   /* ---- градиенты и фильтры ---- */
   const defs=svgEl('defs',{});
@@ -227,6 +234,46 @@ function buildDish(){
     standBack.appendChild(svgEl('circle',{cx:bx,cy:'423',r:'3.2',fill:'url(#goldR)',stroke:'rgba(20,12,4,.6)','stroke-width':'.8'}));
   }
   svg.appendChild(standBack);
+
+  /* ---- доска-стойка: одной доской связана верхушка со стрелкой и основание.
+     доска стоит ЗА тарелкой, поэтому видна сверху (где стрелка) и снизу
+     (между полочкой и основанием), а посередине её — штырь, на котором
+     тарелка крутится. когда тарелка срывается, доска остаётся стоять ---- */
+  const POST={x:187, w:26, top:VB.y+8, bottom:420};   /* доска идёт от шляпки до самого основания */
+  const HEAD={top:VB.y+6, bottom:PIVOT_Y+13};
+  const standPost=svgEl('g',{id:'stand-post','class':'stand'});
+  const postH=POST.bottom-POST.top;
+  standPost.appendChild(svgEl('rect',{x:POST.x-3,y:POST.top+6,width:POST.w+6,height:postH-16,rx:'6',
+    fill:'rgba(10,6,2,.35)',filter:'url(#softShadow)','pointer-events':'none'}));
+  standPost.appendChild(svgEl('rect',{x:POST.x,y:POST.top,width:POST.w,height:postH,rx:'5',
+    fill:'url(#wood)',stroke:'#150d05','stroke-width':'2'}));
+  standPost.appendChild(svgEl('rect',{x:POST.x,y:POST.top,width:POST.w,height:postH,rx:'5',
+    fill:'#e9c98c',filter:'url(#grainWood)',opacity:'.38'}));
+  standPost.appendChild(svgEl('rect',{x:POST.x+2,y:POST.top+3,width:'3.4',height:postH-6,rx:'1.7',
+    fill:'rgba(255,228,176,.18)','pointer-events':'none'}));
+  /* шляпка на верхнем конце доски: в ней висит ось стрелки */
+  standPost.appendChild(svgEl('path',{d:`M170,${HEAD.top} L230,${HEAD.top} L221,${HEAD.bottom} L179,${HEAD.bottom} Z`,
+    fill:'url(#wood)',stroke:'#150d05','stroke-width':'2'}));
+  standPost.appendChild(svgEl('path',{d:`M170,${HEAD.top} L230,${HEAD.top} L227,${HEAD.top+8} L173,${HEAD.top+8} Z`,
+    fill:'rgba(255,228,176,.16)','pointer-events':'none'}));
+  for(const bx of [180,220]){
+    standPost.appendChild(svgEl('circle',{cx:bx,cy:(HEAD.top+HEAD.bottom)/2,r:'2.4',
+      fill:'url(#goldR)',stroke:'rgba(20,12,4,.6)','stroke-width':'.7'}));
+  }
+  /* два шурупа на видимом участке доски */
+  for(const bx of [POST.x+7,POST.x+POST.w-7]){
+    standPost.appendChild(svgEl('circle',{cx:bx,cy:'-16',r:'2',fill:'url(#goldR)',
+      stroke:'rgba(20,12,4,.55)','stroke-width':'.7'}));
+  }
+  /* косой упор, которым доска посажена на ножки */
+  standPost.appendChild(svgEl('path',{d:'M187,282 L166,300 L187,300 Z',fill:'url(#wood)',stroke:'#150d05','stroke-width':'1.6'}));
+  standPost.appendChild(svgEl('path',{d:'M213,282 L234,300 L213,300 Z',fill:'url(#wood)',stroke:'#150d05','stroke-width':'1.6'}));
+  /* шурупы там, где доска сходится с основанием */
+  for(const bx of [POST.x+7,POST.x+POST.w-7]){
+    standPost.appendChild(svgEl('circle',{cx:bx,cy:'404',r:'2.2',fill:'url(#goldR)',
+      stroke:'rgba(20,12,4,.55)','stroke-width':'.7'}));
+  }
+  svg.appendChild(standPost);
 
   /* ставим надпись ровно по центру пластины: базовая линия сама по себе ниже
      центра строки, а letter-spacing оставляет пустое место после последней буквы */
@@ -388,10 +435,6 @@ function buildDish(){
   disc.appendChild(svgEl('path',{d:arcPath(DISH_R-10,14,78),fill:'none',stroke:'rgba(255,238,208,.28)','stroke-width':'3',
     'stroke-linecap':'round','pointer-events':'none'}));
 
-  /* штырёк подставки, на котором висит тарелка */
-  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'11',fill:'url(#goldR)',stroke:'rgba(70,50,18,.55)','stroke-width':'1.4'}));
-  disc.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'4',fill:'#3a2a12'}));
-  disc.appendChild(svgEl('circle',{cx:CX-2.2,cy:CY-2.8,r:'1.5',fill:'rgba(255,252,236,.7)'}));
   svg.appendChild(disc);
 
   /* передняя полочка мольберта: тарелка лежит за ней, на фарфоре — тень от полочки */
@@ -406,16 +449,20 @@ function buildDish(){
   }
   svg.appendChild(standFront);
 
+  /* штырь посередине доски: его головка выглядывает из-под фарфора.
+     штырь принадлежит подставке, а не тарелке, — поэтому остаётся на месте,
+     даже когда тарелка сорвалась и укатилась */
+  const axle=svgEl('g',{id:'axle','pointer-events':'none'});
+  axle.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'15',fill:'rgba(26,16,5,.32)',filter:'url(#softShadow)'}));
+  axle.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'11.5',fill:'url(#goldR)',stroke:'rgba(70,50,18,.7)','stroke-width':'1.5'}));
+  axle.appendChild(svgEl('circle',{cx:CX,cy:CY,r:'4.4',fill:'#3a2a12'}));
+  axle.appendChild(svgEl('circle',{cx:CX-2.8,cy:CY-3.4,r:'1.9',fill:'rgba(255,252,236,.78)'}));
+  svg.appendChild(axle);
+
   /* тень стрелки, падающая на глазурь */
-  svg.appendChild(svgEl('ellipse',{cx:CX,cy:CY-R+20,rx:'14',ry:'22',fill:'rgba(40,28,10,.20)',
+  svg.appendChild(svgEl('ellipse',{cx:CX,cy:CY-R+26,rx:'15',ry:'26',fill:'rgba(40,28,10,.20)',
     filter:'url(#softShadow)','pointer-events':'none'}));
 
-  /* кронштейн и стрелка-указатель */
-  svg.appendChild(svgEl('path',{d:'M181,-4 L219,-4 L213,11 L187,11 Z',fill:'url(#wood)',stroke:'#150d05','stroke-width':'1.8'}));
-  svg.appendChild(svgEl('path',{d:'M181,-4 L219,-4 L217,3 L183,3 Z',fill:'rgba(255,228,176,.16)'}));
-  for(const bx of [189,211]){
-    svg.appendChild(svgEl('circle',{cx:bx,cy:'2',r:'2.2',fill:'url(#goldR)',stroke:'rgba(20,12,4,.6)','stroke-width':'.7'}));
-  }
   /* искры из-под острия стрелки */
   const fx=svgEl('g',{id:'fx','pointer-events':'none'});
   for(let i=0;i<SPARK_MAX;i++) fx.appendChild(svgEl('circle',{class:'spark',r:'1',cx:'-20',cy:'-20',opacity:'0'}));
@@ -423,24 +470,32 @@ function buildDish(){
 
   /* ударная волна при остановке */
   const shock=svgEl('g',{id:'shock','pointer-events':'none'});
+  shock.style.transformOrigin = CX+'px '+(24-VB.y)+'px';   /* отсчёт от верхнего края рамки вида */
   shock.appendChild(svgEl('circle',{cx:CX,cy:'24',r:'26',fill:'none',stroke:'rgba(255,236,190,.9)','stroke-width':'3.4'}));
   shock.appendChild(svgEl('circle',{cx:CX,cy:'24',r:'40',fill:'none',stroke:'rgba(255,214,140,.45)','stroke-width':'1.8'}));
   svg.appendChild(shock);
 
   const pawl=svgEl('g',{id:'pawl'});
+  pawl.style.transformOrigin = PIVOT_X+'px '+(PIVOT_Y-VB.y)+'px';
   /* пружинка */
-  pawl.appendChild(svgEl('path',{d:'M206,10 q9,5 4,13',fill:'none',stroke:'rgba(198,164,88,.6)','stroke-width':'1.6'}));
-  /* рычажок */
-  pawl.appendChild(svgEl('path',{d:'M194.5,1 L205.5,1 L203.8,13 L202.6,21 L197.4,21 L196.2,13 Z',
+  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X+6},${PIVOT_Y+4} q9,5 4,13`,fill:'none',
+    stroke:'rgba(198,164,88,.6)','stroke-width':'1.6'}));
+  /* длинный рычажок: от шляпки доски до золотых точек по борту тарелки */
+  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-5.5},${PIVOT_Y-10} L${PIVOT_X+5.5},${PIVOT_Y-10} `+
+    `L${PIVOT_X+3.4},-14 L${PIVOT_X+2.6},10 L${PIVOT_X-2.6},10 L${PIVOT_X-3.4},-14 Z`,
     fill:'url(#gold)',stroke:'rgba(70,50,18,.75)','stroke-width':'1.3'}));
-  pawl.appendChild(svgEl('path',{d:'M196.6,3 L199,3 L198.4,19 L197.2,19 Z',fill:'rgba(255,252,236,.5)'}));
-  pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'8',fill:'url(#goldR)',stroke:'rgba(70,50,18,.75)','stroke-width':'1.6'}));
-  pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'2.4',fill:'#3a2a12'}));
+  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-3.2},${PIVOT_Y-8} L${PIVOT_X-1},${PIVOT_Y-8} L${PIVOT_X-1.8},8 L${PIVOT_X-2.8},8 Z`,
+    fill:'rgba(255,252,236,.5)'}));
+  pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'8.4',fill:'url(#goldR)',
+    stroke:'rgba(70,50,18,.75)','stroke-width':'1.6'}));
+  pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'2.6',fill:'#3a2a12'}));
   /* стрелка-указатель: остриё стоит над золотыми точками по борту */
-  pawl.appendChild(svgEl('path',{class:'foot',d:'M189.5,16 L210.5,16 L200,30.5 Z',
+  pawl.appendChild(svgEl('path',{class:'foot',d:`M${PIVOT_X-10.5},10 L${PIVOT_X+10.5},10 L${PIVOT_X},28.5 Z`,
     fill:'url(#goldR)',stroke:'rgba(70,50,18,.7)','stroke-width':'1.2','stroke-linejoin':'round'}));
-  pawl.appendChild(svgEl('path',{d:'M193,18.6 L207,18.6 L200,27.4 Z',fill:'rgba(112,82,30,.20)','pointer-events':'none'}));
-  pawl.appendChild(svgEl('path',{d:'M192.6,18 L197.8,18 L195.4,22.4 Z',fill:'rgba(255,252,236,.75)','pointer-events':'none'}));
+  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-7},12.6 L${PIVOT_X+7},12.6 L${PIVOT_X},25.4 Z`,
+    fill:'rgba(112,82,30,.20)','pointer-events':'none'}));
+  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-7.4},12 L${PIVOT_X-2.2},12 L${PIVOT_X-4.6},16.4 Z`,
+    fill:'rgba(255,252,236,.75)','pointer-events':'none'}));
   svg.appendChild(pawl);
 
   highlight(lastWin);
@@ -630,6 +685,7 @@ function spin(){
   SFX.arm();
   frameRect=wf.getBoundingClientRect();
   ambRect=frameRect; ambDish(0,0);          /* фон знает, где тарелка: от неё идёт воронка */
+  standInFront(true);
   if(window.AMB) AMB.frame(0);
   prevAX=0; prevAT=performance.now();
   SFX.setSpeed(0); SFX.rollStop(); SFX.space(0,1);
@@ -698,7 +754,7 @@ function spin(){
       }
       const slot=Math.round((((rot%360)+360)%360)/TAU);
       if(slot!==prevSlot){
-        pawlAngle=Math.min(11, 4+v*14);
+        pawlAngle=Math.min(7.5, 2.8+v*9);    /* рычажок длинный — оттого ход меньше */
         SFX.click(v/V_REF);
         if(!reducedMotion() && v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
         prevSlot=slot;
@@ -717,7 +773,7 @@ function spin(){
       const e=Math.sin(p*Math.PI/2);
       rot=from-BACK*e;
       rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
-      pawlAngle=7*e; setPawl(pawlAngle);
+      pawlAngle=4.5*e; setPawl(pawlAngle);
     }, done);
   }
 
@@ -737,7 +793,7 @@ function spin(){
     if(onAxle){                                  /* стрелка щёлкает только по своим золотым точкам */
       const slot=slotOf(rot);
       if(slot!==prevSlot){
-        pawlAngle=Math.min(11, 4+v*14);
+        pawlAngle=Math.min(7.5, 2.8+v*9);    /* рычажок длинный — оттого ход меньше */
         SFX.click(v/V_REF);
         if(v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
         prevSlot=slot;
@@ -790,6 +846,7 @@ function spin(){
       setDisc(px, fallY(t));
       if(hits<3 && t>=[LEAVE,HIT1,HIT2][hits]){
         hits++;
+        if(hits===1) standInFront(false);          /* тарелка ушла со штырька — полочка теперь за ней */
         if(!reducedMotion()){
           const hx=CX+creep(t), hy=hits===1?26:FLOOR_Y-6;
           sparkBurst(hits===1?4:(hits===2?6:3), hx, hy, hits>1);
@@ -847,7 +904,8 @@ function spin(){
       if((t>=560 && hits===0) || (t>=740 && hits===1)){
         hits++;
         onAxle=true; prevSlot=slotOf(rot);
-        pawlAngle=hits===1?13:8; setPawl(pawlAngle);
+        if(hits===1) standInFront(true);            /* села на штырёк — полочка снова перед тарелкой */
+        pawlAngle=hits===1?9:5.5; setPawl(pawlAngle);
         if(!reducedMotion()){
           sparkBurst(hits===1?5:2); shakeMount();
           if(window.AMB){ const p=ambPoint(CX, 24); AMB.wave(p.x, p.y, hits===1?0.8:0.4); }
@@ -880,7 +938,7 @@ function spin(){
       const p=Math.min(1,(now-t0s)/durS);
       const wob=Math.sin(p*Math.PI*3)*(1-p)*1.6;
       rotor.setAttribute('transform',`rotate(${(rot+wob).toFixed(2)} ${CX} ${CY})`);
-      pawlAngle=Math.sin(p*Math.PI*3)*(1-p)*4;
+      pawlAngle=Math.sin(p*Math.PI*3)*(1-p)*3;
       setPawl(pawlAngle);
       setGlow(V_REF*0.3*(1-p));
       if(p<1) requestAnimationFrame(s); else land();
@@ -977,8 +1035,15 @@ function ambDish(dx, dy){
 }
 /* точка в единицах viewBox → экран: от неё летят искры и расходятся волны */
 function ambPoint(x, y){
-  const fr=$('#dish-frame').getBoundingClientRect(), k=fr.width/400;
-  return { x: fr.left + x*k, y: fr.top + y*k, s:k };
+  const fr=$('#dish-frame').getBoundingClientRect(), k=fr.width/VB.w;
+  return { x: fr.left + (x-VB.x)*k, y: fr.top + (y-VB.y)*k, s:k };
+}
+/* полочка подставки обязана прятаться за тарелку, когда та сорвалась со штырька:
+   иначе она перерезает тарелку, которая катится по полу */
+function standInFront(front){
+  const sf=$('#stand-front'), d=$('#disc');
+  if(!sf || !d) return;
+  sf.parentNode.insertBefore(sf, front ? d.nextSibling : d);
 }
 
 /* ------------------------------ тема ------------------------------ */
