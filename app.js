@@ -474,7 +474,7 @@ function buildDish(){
 
   /* ударная волна при остановке */
   const shock=svgEl('g',{id:'shock','pointer-events':'none'});
-  shock.style.transformOrigin = CX+'px '+(24-VB.y)+'px';   /* отсчёт от верхнего края рамки вида */
+  shock.style.transformOrigin = CX+'px 24px';   /* центр кольца в user-координатах */
   shock.appendChild(svgEl('circle',{cx:CX,cy:'24',r:'26',fill:'none',stroke:'rgba(255,236,190,.9)','stroke-width':'3.4'}));
   shock.appendChild(svgEl('circle',{cx:CX,cy:'24',r:'40',fill:'none',stroke:'rgba(255,214,140,.45)','stroke-width':'1.8'}));
   svg.appendChild(shock);
@@ -489,7 +489,7 @@ function buildDish(){
   svg.appendChild(mount);
 
   const pawl=svgEl('g',{id:'pawl'});
-  pawl.style.transformOrigin = PIVOT_X+'px '+(PIVOT_Y-VB.y)+'px';
+  pawl.style.transformOrigin = PIVOT_X+'px '+PIVOT_Y+'px';   /* user-координаты: сам шарнир */
   pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-5.5},${PIVOT_Y} L${PIVOT_X+5.5},${PIVOT_Y} `+
     `L${PIVOT_X+3.4},-14 L${PIVOT_X+2.6},11 L${PIVOT_X-2.6},11 Z`,
     fill:'url(#gold)',stroke:'rgba(70,50,18,.75)','stroke-width':'1.3'}));
