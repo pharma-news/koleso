@@ -32,84 +32,206 @@ html[data-theme=light]{
 html,body{margin:0; padding:0; overflow-x:hidden}
 body{
   background:
-    radial-gradient(120% 90% at 50% -10%, rgba(255,228,178,.10), transparent 55%),
-    radial-gradient(100% 80% at 50% 120%, rgba(0,0,0,.5), transparent 60%),
+    radial-gradient(120% 90% at 50% -10%, rgba(255,228,178,.10), rgba(255,228,178,.04) 40%, transparent 78%),
+    radial-gradient(110% 86% at 50% 122%, rgba(0,0,0,.5), rgba(0,0,0,.16) 46%, transparent 84%),
     var(--bg);
   color:var(--ink); font-family:var(--font); font-size:1rem; line-height:1.45;
   min-height:100vh; padding-bottom:28px; overflow-x:hidden;
 }
 html[data-theme=light] body{
   background:
-    radial-gradient(120% 90% at 50% -10%, rgba(255,246,222,.9), transparent 55%),
+    radial-gradient(120% 90% at 50% -10%, rgba(255,246,222,.9), rgba(255,246,222,.45) 44%, transparent 82%),
     var(--bg);
 }
 main{max-width:1120px; margin:0 auto; padding:16px 14px; display:grid; gap:18px}
 
 /* --------------------------- живой фон ---------------------------
-   Тёплый свет лампы, который медленно дышит и усиливается, когда тарелка
-   крутится; пылинки в луче; свет слегка гуляет по комнате; плёночное зерно.
+   Комната, в которой стоит тарелка: обои с росписью, конус лампы,
+   объёмные лучи, в которых видна пыль, тёплое пятно света на полу,
+   виньетка и зерно плёнки. Поверх этих слоёв работает canvas (ambient.js):
+   дымка, боке и пылинки трёх глубин — они тянутся за курсором и
+   закручиваются воронкой, когда тарелка крутится.
    Всё под контентом, на клик не реагирует. */
 .ambient{position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;
   transform:translate3d(var(--ax,0px), var(--ay,0px), 0); transition:transform .5s ease-out}
 .amb{position:absolute; inset:-12%}
 main,header{position:relative; z-index:1}
 
+/* стена: сверху тёплый свет лампы, по нижним углам — холодная темнота.
+   у всех пятен свет растворяется плавно (несколько опорных точек), иначе
+   на тёмной стене по краю пятна проступает заметная граница */
+.amb-wall{
+  background:
+    radial-gradient(116% 78% at 50% 0%,
+      rgba(255,226,176,.18), rgba(255,226,176,.13) 26%, rgba(255,226,176,.07) 50%,
+      rgba(255,226,176,.02) 74%, rgba(255,226,176,0) 94%),
+    radial-gradient(70% 52% at 4% 100%,
+      rgba(128,90,46,.14), rgba(128,90,46,.09) 28%, rgba(128,90,46,.045) 52%,
+      rgba(128,90,46,.012) 74%, rgba(128,90,46,0) 92%),
+    radial-gradient(70% 52% at 96% 98%,
+      rgba(128,90,46,.12), rgba(128,90,46,.075) 28%, rgba(128,90,46,.038) 52%,
+      rgba(128,90,46,.01) 74%, rgba(128,90,46,0) 92%),
+    linear-gradient(180deg, #1b1611 0%, #131009 40%, #0a0907 100%);
+}
+/* обои: спокойная ромбовидная решётка с точками на стыках — как клеевая
+   бумага в старой комнате. Узор виден только там, куда достаёт свет,
+   и стоит неподвижно: дышащая маска перекрашивала бы слой каждый кадр */
+.amb-paper{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23ffe6bd' stroke-opacity='.13' stroke-width='1'%3E%3Cpath d='M36 0L72 36L36 72L0 36Z'/%3E%3Cpath d='M36 13L59 36L36 59L13 36Z' stroke-opacity='.07'/%3E%3C/g%3E%3Cg fill='%23ffe6bd'%3E%3Ccircle cx='36' cy='0' r='1.6' fill-opacity='.15'/%3E%3Ccircle cx='36' cy='72' r='1.6' fill-opacity='.15'/%3E%3Ccircle cx='0' cy='36' r='1.6' fill-opacity='.15'/%3E%3Ccircle cx='72' cy='36' r='1.6' fill-opacity='.15'/%3E%3Ccircle cx='36' cy='36' r='1' fill-opacity='.09'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:72px 72px;
+  -webkit-mask-image:radial-gradient(80% 66% at 50% 20%, #000 0%, rgba(0,0,0,.85) 26%, rgba(0,0,0,.6) 46%, rgba(0,0,0,.34) 64%, rgba(0,0,0,.14) 80%, rgba(0,0,0,0) 94%);
+          mask-image:radial-gradient(80% 66% at 50% 20%, #000 0%, rgba(0,0,0,.85) 26%, rgba(0,0,0,.6) 46%, rgba(0,0,0,.34) 64%, rgba(0,0,0,.14) 80%, rgba(0,0,0,0) 94%);
+}
+
 .amb-lamp{
   background:
-    radial-gradient(42% 34% at 50% 32%, rgba(255,216,146,.17), rgba(255,190,110,.06) 46%, transparent 74%),
-    radial-gradient(70% 46% at 50% 24%, rgba(255,232,186,.07), transparent 70%);
+    radial-gradient(46% 38% at 50% 30%,
+      rgba(255,216,146,.18), rgba(255,204,128,.13) 26%, rgba(255,190,110,.07) 50%,
+      rgba(255,190,110,.02) 72%, rgba(255,190,110,0) 92%),
+    radial-gradient(82% 58% at 50% 18%,
+      rgba(255,232,186,.075), rgba(255,232,186,.05) 30%, rgba(255,232,186,.026) 56%,
+      rgba(255,232,186,.008) 78%, rgba(255,232,186,0) 96%);
   animation:lampBreathe 15s ease-in-out infinite;
   transition:filter .6s ease;
 }
 @keyframes lampBreathe{0%,100%{opacity:.82; transform:scale(1)} 50%{opacity:1; transform:scale(1.06)}}
 body.lit .amb-lamp{filter:brightness(1.55) saturate(1.06)}
-/* мягкий конус света, который медленно качается, как качнувшаяся лампа */
+/* мягкий конус света, который медленно качается, как качнувшаяся лампа.
+   двигается только transform: он не перекрашивает слой, а значит почти бесплатен */
 .amb-lamp::after{content:''; position:absolute; left:-8%; top:-12%; width:58%; height:124%;
   background:linear-gradient(102deg, rgba(255,222,160,.10), rgba(255,222,160,0) 58%);
   animation:beamSway 26s ease-in-out infinite alternate}
-@keyframes beamSway{0%{opacity:.7; transform:translate3d(-2%,0,0) rotate(-4deg)}
-  100%{opacity:1; transform:translate3d(7%,1%,0) rotate(2deg)}}
+@keyframes beamSway{0%{transform:translate3d(-2%,0,0) rotate(-4deg)}
+  100%{transform:translate3d(7%,1%,0) rotate(2deg)}}
 
 .amb-drift{
   background:
-    radial-gradient(34% 30% at 18% 26%, rgba(255,230,186,.09), transparent 66%),
-    radial-gradient(30% 26% at 84% 72%, rgba(150,112,64,.13), transparent 66%);
+    radial-gradient(40% 36% at 16% 20%,
+      rgba(255,230,186,.10), rgba(255,230,186,.07) 28%, rgba(255,230,186,.035) 54%,
+      rgba(255,230,186,.01) 76%, rgba(255,230,186,0) 94%),
+    radial-gradient(38% 34% at 86% 78%,
+      rgba(150,112,64,.14), rgba(150,112,64,.10) 28%, rgba(150,112,64,.05) 54%,
+      rgba(150,112,64,.015) 76%, rgba(150,112,64,0) 94%);
   animation:ambDrift 54s ease-in-out infinite alternate;
 }
 @keyframes ambDrift{0%{transform:translate3d(-4%,-2%,0) scale(1.06)} 100%{transform:translate3d(5%,3%,0) scale(1.14)}}
 
-.mote{position:absolute; border-radius:50%; background:rgba(255,228,174,.85);
-  box-shadow:0 0 7px rgba(255,204,124,.45); opacity:0;
-  animation:moteFloat var(--d,26s) linear infinite}
-@keyframes moteFloat{
-  0%{opacity:0; transform:translate3d(0,0,0)}
-  12%{opacity:var(--o,.4)} 82%{opacity:var(--o,.4)}
-  100%{opacity:0; transform:translate3d(var(--dx,20px), var(--dy,-180px),0)}
+/* объёмные лучи: два столба света, в которых ходит пыль.
+   мягкость даёт сам градиент: blur() по всему экрану — самая дорогая вещь
+   в таком фоне, на слабом ноутбуке именно он и тормозит. Здесь его нет. */
+.amb-rays{opacity:.85; transition:opacity .6s ease}
+.amb-rays::before, .amb-rays::after{content:''; position:absolute; top:-26%; height:158%;
+  will-change:transform;
+  background:linear-gradient(97deg,
+    rgba(255,228,174,0) 0%, rgba(255,228,174,.04) 20%, rgba(255,228,174,.10) 42%,
+    rgba(255,228,174,.13) 54%, rgba(255,228,174,.07) 70%, rgba(255,228,174,.018) 84%,
+    rgba(255,228,174,0) 96%)}
+.amb-rays::before{left:-6%; width:44%; animation:shaftA 21s ease-in-out infinite alternate}
+.amb-rays::after{left:52%; width:30%; opacity:.75; animation:shaftB 29s ease-in-out infinite alternate}
+@keyframes shaftA{0%{transform:translate3d(-3%,0,0) rotate(11deg)}
+  100%{transform:translate3d(4%,1%,0) rotate(16deg)}}
+@keyframes shaftB{0%{transform:translate3d(3%,0,0) rotate(-13deg)}
+  100%{transform:translate3d(-4%,1%,0) rotate(-8deg)}}
+body.lit .amb-rays{opacity:1}
+
+/* дымка, боке и пылинки трёх глубин — рисует ambient.js.
+   холст на 30px шире экрана в каждую сторону: параллакс не обнажает край */
+.amb-fx{inset:-30px; width:calc(100% + 60px); height:calc(100% + 60px)}
+
+/* пол: тёплое пятно под лампой и темная дорожка к углам комнаты.
+   пятно растворяется ровно к границам блока — тогда стык стены и пола не виден */
+.amb-floor{inset:auto -12% -12% -12%; height:52%;
+  background:
+    radial-gradient(58% 50% at 50% 50%,
+      rgba(255,208,144,.13), rgba(255,208,144,.08) 32%, rgba(255,208,144,.03) 66%, rgba(255,208,144,0) 100%),
+    radial-gradient(26% 40% at 12% 76%,
+      rgba(255,190,120,.06), rgba(255,190,120,.03) 40%, rgba(255,190,120,0) 92%),
+    linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(18,12,7,.42) 44%, rgba(6,5,4,.74) 100%);
+  animation:floorGlow 19s ease-in-out infinite;
 }
+@keyframes floorGlow{0%,100%{opacity:.86} 50%{opacity:1}}
+body.lit .amb-floor{filter:brightness(1.3)}
+
+/* виньетка: взгляд собирается к тарелке. блок чуть больше экрана,
+   чтобы параллакс не обнажил край, и свет уходит к углам плавно */
+.amb-vignette{inset:-24px;
+  background:radial-gradient(78% 74% at 50% 47%,
+    rgba(0,0,0,0) 0%, rgba(0,0,0,0) 34%, rgba(0,0,0,.07) 56%, rgba(0,0,0,.2) 76%,
+    rgba(0,0,0,.38) 92%, rgba(0,0,0,.46) 100%);
+  animation:vigBreathe 13s ease-in-out infinite;
+}
+@keyframes vigBreathe{0%,100%{opacity:.92} 50%{opacity:1}}
+body.lit .amb-vignette{filter:brightness(1.12)}
 
 .amb-grain{
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   opacity:.055; mix-blend-mode:overlay;
 }
 
+/* днём та же комната при окна: тёплый крем, узор заметнее, лучей почти нет */
+html[data-theme=light] .amb-wall{
+  background:
+    radial-gradient(112% 72% at 50% 0%, rgba(255,247,224,.95), rgba(255,247,224,.45) 42%, transparent 80%),
+    radial-gradient(62% 46% at 8% 98%, rgba(214,186,136,.4), rgba(214,186,136,.16) 38%, transparent 78%),
+    radial-gradient(62% 46% at 92% 96%, rgba(214,186,136,.32), rgba(214,186,136,.13) 38%, transparent 78%),
+    linear-gradient(180deg, #fbf6ea 0%, #f2ead9 52%, #e6dcc8 100%);
+}
+html[data-theme=light] .amb-paper{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%238a6f3e' stroke-opacity='.26' stroke-width='1'%3E%3Cpath d='M36 0L72 36L36 72L0 36Z'/%3E%3Cpath d='M36 13L59 36L36 59L13 36Z' stroke-opacity='.14'/%3E%3C/g%3E%3Cg fill='%238a6f3e'%3E%3Ccircle cx='36' cy='0' r='1.6' fill-opacity='.3'/%3E%3Ccircle cx='36' cy='72' r='1.6' fill-opacity='.3'/%3E%3Ccircle cx='0' cy='36' r='1.6' fill-opacity='.3'/%3E%3Ccircle cx='72' cy='36' r='1.6' fill-opacity='.3'/%3E%3Ccircle cx='36' cy='36' r='1' fill-opacity='.18'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-image:radial-gradient(84% 70% at 50% 18%, #000 0%, rgba(0,0,0,.8) 28%, rgba(0,0,0,.55) 48%, rgba(0,0,0,.3) 66%, rgba(0,0,0,.12) 82%, rgba(0,0,0,0) 96%);
+          mask-image:radial-gradient(84% 70% at 50% 18%, #000 0%, rgba(0,0,0,.8) 28%, rgba(0,0,0,.55) 48%, rgba(0,0,0,.3) 66%, rgba(0,0,0,.12) 82%, rgba(0,0,0,0) 96%);
+}
 html[data-theme=light] .amb-lamp{
   background:
-    radial-gradient(46% 36% at 50% 28%, rgba(255,214,140,.42), rgba(255,226,178,.14) 48%, transparent 76%),
-    radial-gradient(80% 50% at 50% 18%, rgba(255,246,222,.5), transparent 72%);
+    radial-gradient(48% 38% at 50% 28%, rgba(255,214,140,.42), rgba(255,226,178,.16) 46%, rgba(255,226,178,0) 88%),
+    radial-gradient(84% 56% at 50% 16%, rgba(255,246,222,.5), rgba(255,246,222,.18) 46%, rgba(255,246,222,0) 90%);
 }
+html[data-theme=light] .amb-lamp::after{background:linear-gradient(102deg, rgba(255,246,220,.72), rgba(255,246,220,0) 60%)}
+html[data-theme=light] .amb-rays{opacity:.22}
+html[data-theme=light] .amb-rays::before,
+html[data-theme=light] .amb-rays::after{
+  background:linear-gradient(97deg,
+    rgba(255,250,236,0) 0%, rgba(255,250,236,.16) 22%, rgba(255,250,236,.42) 44%,
+    rgba(255,250,236,.5) 54%, rgba(255,250,236,.26) 70%, rgba(255,250,236,.06) 84%,
+    rgba(255,250,236,0) 96%)}
 html[data-theme=light] .amb-drift{
   background:
-    radial-gradient(34% 30% at 16% 22%, rgba(255,238,206,.75), transparent 66%),
-    radial-gradient(32% 28% at 86% 76%, rgba(214,186,136,.4), transparent 66%);
+    radial-gradient(38% 34% at 16% 20%, rgba(255,238,206,.75), rgba(255,238,206,.34) 44%, transparent 84%),
+    radial-gradient(36% 32% at 86% 78%, rgba(214,186,136,.4), rgba(214,186,136,.16) 42%, transparent 84%);
 }
-html[data-theme=light] .mote{background:rgba(150,116,62,.65); box-shadow:0 0 6px rgba(190,158,96,.35)}
+html[data-theme=light] .amb-floor{
+  background:
+    radial-gradient(70% 78% at 50% 78%,
+      rgba(255,246,218,.75), rgba(255,246,218,.42) 38%, rgba(255,246,218,.14) 70%, rgba(255,246,218,0) 100%),
+    linear-gradient(180deg, rgba(120,98,60,0) 0%, rgba(120,98,60,.1) 46%, rgba(96,76,44,.2) 100%);
+}
+html[data-theme=light] .amb-vignette{
+  background:radial-gradient(80% 76% at 50% 46%,
+    rgba(120,96,58,0) 0%, rgba(120,96,58,0) 40%, rgba(120,96,58,.05) 62%,
+    rgba(120,96,58,.12) 82%, rgba(120,96,58,.2) 100%);
+}
 html[data-theme=light] .amb-grain{opacity:.05; mix-blend-mode:multiply}
-html[data-theme=light] .amb-lamp::after{background:linear-gradient(102deg, rgba(255,246,220,.72), rgba(255,246,220,0) 60%)}
 @media (prefers-reduced-motion: reduce){
-  .amb-lamp,.amb-drift,.amb-lamp::after,.mote{animation:none}
+  .amb-lamp,.amb-drift,.amb-lamp::after,.amb-floor,.amb-vignette,
+  .amb-rays::before,.amb-rays::after{animation:none}
   .ambient{transition:none}
-  .mote{opacity:.3}
 }
+
+/* --------------------------- слабый ноутбук ---------------------------
+   ambient.js сам решает, сколько себе позволить, и вешает на body класс
+   amb-low / amb-med / amb-high (можно задать руками: ?amb=off|low|med|high).
+   На низком уровне из фона уходит всё дорогое: размытие под шапкой и
+   карточкой, смешивание зерна, фильтр яркости и дышащие перекраски слоёв.
+   Остаётся свет, обои и спокойная пыль — дёшево и неподвижно по цене кадра. */
+body.amb-low .amb-lamp, body.amb-low .amb-drift, body.amb-low .amb-floor,
+body.amb-low .amb-vignette, body.amb-low .amb-lamp::after,
+body.amb-low .amb-rays::before, body.amb-low .amb-rays::after{animation:none}
+body.amb-low .amb-lamp, body.amb-low .amb-rays, body.amb-low .amb-floor{transition:none}
+body.amb-low.lit .amb-lamp, body.amb-low.lit .amb-floor, body.amb-low.lit .amb-vignette{filter:none}
+body.amb-low .amb-grain{mix-blend-mode:normal; opacity:.035}
+body.amb-low .topbar{backdrop-filter:none; -webkit-backdrop-filter:none}
+body.amb-low .word-card{backdrop-filter:none; -webkit-backdrop-filter:none}
+body.amb-off .ambient{display:none}
 
 /* --------------------------- шапка --------------------------- */
 .topbar{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
@@ -117,7 +239,13 @@ html[data-theme=light] .amb-lamp::after{background:linear-gradient(102deg, rgba(
 /* шапка полупрозрачная: свет за ней слегка ходит; если color-mix не поддерживается,
    остаётся плотный фон выше */
 @supports (background:color-mix(in srgb, red 50%, transparent)){
-  .topbar{background:color-mix(in srgb, var(--bg-2) 84%, transparent); backdrop-filter:blur(5px)}
+  .topbar{background:color-mix(in srgb, var(--bg-2) 70%, transparent);
+    backdrop-filter:blur(9px) saturate(1.15); -webkit-backdrop-filter:blur(9px) saturate(1.15)}
+  /* карточка со словом тоже чуть прозрачна: тёплый свет проходит сквозь неё.
+     днём — почти плотная: на креме полупрозрачная карточка теряет контраст */
+  .word-card{background:color-mix(in srgb, var(--card) 88%, transparent); backdrop-filter:blur(6px)}
+  html[data-theme=light] .word-card{background:color-mix(in srgb, var(--card) 97%, transparent);
+    backdrop-filter:none; -webkit-backdrop-filter:none}
 }
 .brand{display:flex; align-items:center; gap:11px}
 .brand .logo{font-size:1.6rem}
@@ -135,7 +263,7 @@ button.chip:hover{border-color:var(--brass); color:var(--brass)}
 /* --------------------------- тарелка --------------------------- */
 .dish-zone{display:flex; flex-direction:column; align-items:center; gap:18px}
 .stage{perspective:1500px}
-.dish-frame{position:relative; width:min(86vw, 560px); aspect-ratio:400/448; transform:rotateX(24deg);
+.dish-frame{position:relative; width:min(86vw, 560px); aspect-ratio:400/504; transform:rotateX(24deg);
   filter:drop-shadow(0 26px 30px rgba(0,0,0,.5)); transition:transform .5s ease}
 html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,.22))}
 .dish-frame.spin{transform:rotateX(20deg)}
@@ -144,7 +272,7 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
 .dish-frame.hit{animation:thunk .6s cubic-bezier(.2,1.3,.4,1)}
 @keyframes thunk{0%{transform:rotateX(24deg) scale(1.012)} 40%{transform:rotateX(26deg) scale(.997)} 100%{transform:rotateX(24deg) scale(1)}}
 #dish{width:100%; height:100%; display:block; overflow:visible}
-.dish-tap{position:absolute; left:5%; right:5%; top:1%; height:82%; border-radius:50%; border:none;
+.dish-tap{position:absolute; left:5%; right:5%; top:11%; height:78%; border-radius:50%; border:none;
   background:transparent; cursor:pointer; touch-action:manipulation; z-index:5}
 .dish-tap:focus-visible{outline:3px solid var(--brass); outline-offset:8px; border-radius:50%}
 .dish-tap.busy{pointer-events:none}
@@ -170,13 +298,16 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
 .sheen{opacity:.9}
 .gloss{opacity:.85}
 .mount-txt{fill:#2b1c08; font-size:11.5px; letter-spacing:2.8px; font-weight:800; font-family:var(--font)}
-.mount-txt-hi{fill:rgba(255,253,244,.62); font-size:11.5px; letter-spacing:2.8px; font-weight:800; font-family:var(--font)}#pawl{transform-box:view-box; transform-origin:200px 6px; will-change:transform; transition:transform .2s ease-out}
+.mount-txt-hi{fill:rgba(255,253,244,.62); font-size:11.5px; letter-spacing:2.8px; font-weight:800; font-family:var(--font)}
+/* качается только указатель на нижнем шарнире (y=1); плечо выше закреплено намертво.
+   отсчёт от верхнего края рамки вида (y=-56) */
+#pawl{transform-box:view-box; transform-origin:200px 57px; will-change:transform; transition:transform .2s ease-out}
 .dish-frame.spin #pawl{transition:none}
-.dish-frame:not(.spin):hover #pawl{transform:rotate(-8deg)}
+.dish-frame:not(.spin):hover #pawl{transform:rotate(-7deg)}
 #rotor{will-change:transform}
 #disc{transform-box:view-box; will-change:transform}
 /* подставка вздрагивает, когда тарелка возвращается на штырёк */
-.stand{transform-box:view-box; transform-origin:200px 430px}
+.stand{transform-box:view-box; transform-origin:200px 486px}
 .stand.shake{animation:mountShake .6s cubic-bezier(.3,.8,.4,1)}
 @keyframes mountShake{0%{transform:translate(0,0)} 18%{transform:translate(0,4px)} 42%{transform:translate(-1.5px,-2px)}
   66%{transform:translate(1px,1.5px)} 100%{transform:translate(0,0)}}
@@ -185,7 +316,7 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
 .spark{fill:#fff3d2; stroke:rgba(255,178,88,.4); stroke-width:1.4}
 #halo{transition:opacity .25s linear; transform-box:view-box}
 #streaks{transition:opacity .2s linear}
-#shock{opacity:0; transform-box:view-box; transform-origin:200px 24px}
+#shock{opacity:0; transform-box:view-box; transform-origin:200px 80px}
 #shock.go{animation:shockGo 1.1s cubic-bezier(.12,.72,.28,1)}
 @keyframes shockGo{0%{opacity:.95; transform:scale(.25)} 55%{opacity:.45} 100%{opacity:0; transform:scale(3.4)}}
 .dish-frame.spin #pawl .foot{fill:#fff8e2; filter:drop-shadow(0 0 5px rgba(255,214,140,.9))}
@@ -254,7 +385,7 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
   .dish-zone{grid-column:1; grid-row:1}
   .result{grid-column:2; grid-row:1}
   .spin-row{order:2; margin-top:26px}
-  .dish-frame{width:min(620px, calc(100vw - 470px))}
+  .dish-frame{width:min(620px, calc(100vw - 470px), 66vh)}   /* рамка стала выше — следим за высотой экрана */
 }
 /* --------------------------- альбомная ориентация телефона --------------------------- */
 @media (max-width:859px) and (orientation:landscape){
@@ -262,5 +393,5 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
   .dish-zone{grid-column:1}
   .result{grid-column:2}
   .btn.big{width:100%}
-  .dish-frame{width:min(68vh, 520px)}
+  .dish-frame{width:min(54vh, 520px)}   /* высота рамки = ширина × 1.26 — вписываем её в экран */
 }

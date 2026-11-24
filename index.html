@@ -6,14 +6,19 @@
 <meta name="color-scheme" content="light dark">
 <title>Тарелка слов — крути, найди слово и расскажи, что оно значит</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%BD%EF%B8%8F%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=30">
+<link rel="stylesheet" href="styles.css?v=34">
 </head>
 <body>
 
 <div class="ambient" aria-hidden="true">
-  <div class="amb amb-lamp"></div>
+  <div class="amb amb-wall"></div>
+  <div class="amb amb-paper"></div>
   <div class="amb amb-drift"></div>
-  <div class="amb amb-motes" id="amb-motes"></div>
+  <div class="amb amb-lamp"></div>
+  <div class="amb amb-rays"></div>
+  <canvas class="amb amb-fx" id="amb-fx"></canvas>
+  <div class="amb amb-floor"></div>
+  <div class="amb amb-vignette"></div>
   <div class="amb amb-grain"></div>
 </div>
 
@@ -33,7 +38,7 @@
   <section class="dish-zone">
     <div class="stage">
       <div class="dish-frame" id="dish-frame">
-        <svg id="dish" viewBox="0 0 400 448" role="img" aria-label="Тарелка слов: двенадцать секторов со словами, сверху стрелка-указатель"></svg>
+        <svg id="dish" viewBox="0 -56 400 504" role="img" aria-label="Тарелка слов: двенадцать секторов со словами, сверху стрелка-указатель"></svg>
         <button class="dish-tap" id="dish-tap" aria-label="Крутить тарелку"></button>
       </div>
     </div>
@@ -56,6 +61,7 @@
 </main>
 
 <script src="sound.js?v=16"></script>
-<script src="app.js?v=31"></script>
+<script src="ambient.js?v=3"></script>
+<script src="app.js?v=36"></script>
 </body>
 </html>
