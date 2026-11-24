@@ -23,6 +23,7 @@ const WELL=60;                     /* неглубокая фарфоровая 
 const TILE_OUT=148, TILE_IN=64, TILE_H=26; /* плашки со словами: вдоль радиуса, читаются вниз к центру */
 const ROMAN_R=51;                  /* римские номера секторов */
 const PIVOT_X=200, PIVOT_Y=VB.y+16;  /* ось стрелки — в шляпке на верхнем конце доски */
+const HINGE_Y=1;                     /* нижний шарнир указателя: выше него стрелка неподвижна */
 
 const KEY='tarelka_v1', OLD_KEY='koleso_v1';
 const SVGNS='http://www.w3.org/2000/svg';
@@ -58,7 +59,7 @@ function loadState(){
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
 
 let words=WORDS.slice();
-let rot=0, spinning=false, lastWin=-1, pawlAngle=0;
+let rot=0, spinning=false, lastWin=-1, pawlAngle=0, pawlTrem=0;
 /* для звука: где тарелка на экране и сколько она проехала за кадр */
 let frameRect=null, prevAX=0, prevAT=0;
 
@@ -479,28 +480,38 @@ function buildDish(){
   shock.appendChild(svgEl('circle',{cx:CX,cy:'24',r:'40',fill:'none',stroke:'rgba(255,214,140,.45)','stroke-width':'1.8'}));
   svg.appendChild(shock);
 
-  const pawl=svgEl('g',{id:'pawl'});
-  pawl.style.transformOrigin = PIVOT_X+'px '+(PIVOT_Y-VB.y)+'px';
-  /* пружинка */
-  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X+6},${PIVOT_Y+4} q9,5 4,13`,fill:'none',
-    stroke:'rgba(198,164,88,.6)','stroke-width':'1.6'}));
-  /* длинный рычажок: от оси в шляпке до золотых точек по борту.
-     выше оси ничего не торчит — иначе кажется, что стрелка болтается в шляпке */
-  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-5.5},${PIVOT_Y} L${PIVOT_X+5.5},${PIVOT_Y} `+
-    `L${PIVOT_X+3.4},-14 L${PIVOT_X+2.6},10 L${PIVOT_X-2.6},10 L${PIVOT_X-3.4},-14 Z`,
+  /* стрелка собрана из двух частей: плечо намертво закреплено в шляпке доски,
+     а внизу, у самого борта, указатель качается на своём шарнире — это он
+     спотыкается о неровный борт. весь верх неподвижен */
+  const arm=svgEl('g',{id:'pawl-arm','pointer-events':'none'});
+  arm.appendChild(svgEl('path',{d:`M${PIVOT_X+5},-18 q9,7 4,17`,fill:'none',
+    stroke:'rgba(198,164,88,.6)','stroke-width':'1.6'}));           /* пружинка к шарниру */
+  arm.appendChild(svgEl('path',{d:`M${PIVOT_X-5.5},${PIVOT_Y} L${PIVOT_X+5.5},${PIVOT_Y} `+
+    `L${PIVOT_X+4.2},${HINGE_Y} L${PIVOT_X-4.2},${HINGE_Y} Z`,
     fill:'url(#gold)',stroke:'rgba(70,50,18,.75)','stroke-width':'1.3'}));
-  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-3.2},${PIVOT_Y+3} L${PIVOT_X-1},${PIVOT_Y+3} L${PIVOT_X-1.8},8 L${PIVOT_X-2.8},8 Z`,
-    fill:'rgba(255,252,236,.5)'}));
-  pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'8.4',fill:'url(#goldR)',
+  arm.appendChild(svgEl('path',{d:`M${PIVOT_X-3.2},${PIVOT_Y+3} L${PIVOT_X-1},${PIVOT_Y+3} `+
+    `L${PIVOT_X-1.6},${HINGE_Y-2} L${PIVOT_X-2.6},${HINGE_Y-2} Z`, fill:'rgba(255,252,236,.5)'}));
+  arm.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'8.4',fill:'url(#goldR)',
     stroke:'rgba(70,50,18,.75)','stroke-width':'1.6'}));
-  pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'2.6',fill:'#3a2a12'}));
-  /* стрелка-указатель: остриё стоит над золотыми точками по борту */
+  arm.appendChild(svgEl('circle',{cx:PIVOT_X,cy:PIVOT_Y,r:'2.6',fill:'#3a2a12'}));
+  svg.appendChild(arm);
+
+  const pawl=svgEl('g',{id:'pawl'});
+  pawl.style.transformOrigin = PIVOT_X+'px '+(HINGE_Y-VB.y)+'px';
+  /* черенка указателя: от шарнира до острия над золотыми точками борта */
+  pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-4},${HINGE_Y} L${PIVOT_X+4},${HINGE_Y} `+
+    `L${PIVOT_X+2.6},11 L${PIVOT_X-2.6},11 Z`,
+    fill:'url(#gold)',stroke:'rgba(70,50,18,.75)','stroke-width':'1.3'}));
   pawl.appendChild(svgEl('path',{class:'foot',d:`M${PIVOT_X-10.5},10 L${PIVOT_X+10.5},10 L${PIVOT_X},28.5 Z`,
     fill:'url(#goldR)',stroke:'rgba(70,50,18,.7)','stroke-width':'1.2','stroke-linejoin':'round'}));
   pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-7},12.6 L${PIVOT_X+7},12.6 L${PIVOT_X},25.4 Z`,
     fill:'rgba(112,82,30,.20)','pointer-events':'none'}));
   pawl.appendChild(svgEl('path',{d:`M${PIVOT_X-7.4},12 L${PIVOT_X-2.2},12 L${PIVOT_X-4.6},16.4 Z`,
     fill:'rgba(255,252,236,.75)','pointer-events':'none'}));
+  /* шарнир, которым указатель держится за плечо */
+  pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:HINGE_Y,r:'4.6',fill:'url(#goldR)',
+    stroke:'rgba(70,50,18,.7)','stroke-width':'1.3'}));
+  pawl.appendChild(svgEl('circle',{cx:PIVOT_X,cy:HINGE_Y,r:'1.7',fill:'#3a2a12'}));
   svg.appendChild(pawl);
 
   highlight(lastWin);
@@ -523,6 +534,20 @@ function setPawl(deg){
   if(!p) return;
   /* когда стрелка в покое, снимаем inline-стиль — тогда работает :hover */
   p.style.transform = Math.abs(deg)<0.06 ? '' : `rotate(${deg.toFixed(2)}deg)`;
+}
+/* удар зубца об остриё: борт тарелки не идеальный, поэтому по каждой золотой
+   точке свой микроудар — где-то указатель отлетает сильнее, где-то слабее */
+function pawlKick(v, slot){
+  const h=Math.sin(slot*12.9898+7.13)*43758.5453;
+  const uneven=0.85+0.3*((h-Math.floor(h))*2-1);        /* −1..1 по своему зубцу */
+  pawlAngle=-Math.min(13, (2.6+v*13)*uneven);           /* назад, против хода колеса */
+}
+/* каждый кадр: указатель пружинит обратно и дрожит об неровный борт на ходу.
+   качается только нижняя часть на шарнире — плечо выше стоит намертво */
+function pawlTick(dt, v){
+  pawlAngle+=(0-pawlAngle)*Math.min(1, dt/70);
+  pawlTrem=(pawlTrem+(Math.random()-0.5)*Math.min(1, v/V_REF)*1.5)*0.7;
+  setPawl(pawlAngle+pawlTrem);
 }
 
 /* ------------------------------ искры и свечение ------------------------------ */
@@ -690,7 +715,7 @@ function spin(){
   SFX.arm();
   frameRect=wf.getBoundingClientRect();
   ambRect=frameRect; ambDish(0,0);          /* фон знает, где тарелка: от неё идёт воронка */
-  standInFront(true);
+  standInFront(true); pawlTrem=0;
   if(window.AMB) AMB.frame(0);
   prevAX=0; prevAT=performance.now();
   SFX.setSpeed(0); SFX.rollStop(); SFX.space(0,1);
@@ -760,13 +785,12 @@ function spin(){
       }
       const slot=Math.round((((rot%360)+360)%360)/TAU);
       if(slot!==prevSlot){
-        pawlAngle=-Math.min(6, 2.2+v*7);   /* зубья отжимают стрелку назад, а не в колесо */
+        pawlKick(v, slot);
         SFX.click(v/V_REF);
         if(!reducedMotion() && v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
         prevSlot=slot;
       }
-      pawlAngle+=(0-pawlAngle)*Math.min(1, dt/70);
-      setPawl(pawlAngle);
+      pawlTick(dt, v);
       if(p<1) requestAnimationFrame(f); else done();
     })(performance.now());
   }
@@ -779,7 +803,7 @@ function spin(){
       const e=Math.sin(p*Math.PI/2);
       rot=from-BACK*e;
       rotor.setAttribute('transform',`rotate(${rot.toFixed(2)} ${CX} ${CY})`);
-      pawlAngle=4.5*e; setPawl(pawlAngle);
+      pawlAngle=6*e; setPawl(pawlAngle);
     }, done);
   }
 
@@ -799,14 +823,13 @@ function spin(){
     if(onAxle){                                  /* стрелка щёлкает только по своим золотым точкам */
       const slot=slotOf(rot);
       if(slot!==prevSlot){
-        pawlAngle=-Math.min(6, 2.2+v*7);   /* зубья отжимают стрелку назад, а не в колесо */
+        pawlKick(v, slot);
         SFX.click(v/V_REF);
         if(v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
         prevSlot=slot;
       }
     }
-    pawlAngle+=(0-pawlAngle)*Math.min(1, dt/70);
-    setPawl(pawlAngle);
+    pawlTick(dt, v);
   }
   function spinBy(dt){ rot+=v*dt; drawSpin(dt); }
   function tick(now){ const dt=Math.max(1, now-prevT); prevT=now; return dt; }
@@ -911,7 +934,7 @@ function spin(){
         hits++;
         onAxle=true; prevSlot=slotOf(rot);
         if(hits===1) standInFront(true);            /* села на штырёк — полочка снова перед тарелкой */
-        pawlAngle=hits===1?-7:-4.5; setPawl(pawlAngle);
+        pawlAngle=hits===1?-11:-7; setPawl(pawlAngle);
         if(!reducedMotion()){
           sparkBurst(hits===1?5:2); shakeMount();
           if(window.AMB){ const p=ambPoint(CX, 24); AMB.wave(p.x, p.y, hits===1?0.8:0.4); }
@@ -944,7 +967,7 @@ function spin(){
       const p=Math.min(1,(now-t0s)/durS);
       const wob=Math.sin(p*Math.PI*3)*(1-p)*1.6;
       rotor.setAttribute('transform',`rotate(${(rot+wob).toFixed(2)} ${CX} ${CY})`);
-      pawlAngle=-Math.sin(p*Math.PI*3)*(1-p)*3;
+      pawlAngle=-Math.sin(p*Math.PI*3)*(1-p)*6;
       setPawl(pawlAngle);
       setGlow(V_REF*0.3*(1-p));
       if(p<1) requestAnimationFrame(s); else land();

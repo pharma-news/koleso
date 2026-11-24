@@ -299,10 +299,11 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
 .gloss{opacity:.85}
 .mount-txt{fill:#2b1c08; font-size:11.5px; letter-spacing:2.8px; font-weight:800; font-family:var(--font)}
 .mount-txt-hi{fill:rgba(255,253,244,.62); font-size:11.5px; letter-spacing:2.8px; font-weight:800; font-family:var(--font)}
-/* ось стрелки — в шляпке наверху доски; отсчёт от верхнего края рамки вида (y=-56) */
-#pawl{transform-box:view-box; transform-origin:200px 16px; will-change:transform; transition:transform .2s ease-out}
+/* качается только указатель на нижнем шарнире (y=1); плечо выше закреплено намертво.
+   отсчёт от верхнего края рамки вида (y=-56) */
+#pawl{transform-box:view-box; transform-origin:200px 57px; will-change:transform; transition:transform .2s ease-out}
 .dish-frame.spin #pawl{transition:none}
-.dish-frame:not(.spin):hover #pawl{transform:rotate(-5deg)}
+.dish-frame:not(.spin):hover #pawl{transform:rotate(-7deg)}
 #rotor{will-change:transform}
 #disc{transform-box:view-box; will-change:transform}
 /* подставка вздрагивает, когда тарелка возвращается на штырёк */
