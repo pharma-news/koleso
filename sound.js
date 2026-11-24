@@ -847,7 +847,7 @@ const SFX={
       reveal7: {e:e=>{ pin(e); e.reveal(7); },       at:[D[7],D[7]+7,D[7]+12], tail:[0.05,0.35]},
       reveal2: {e:e=>{ pin(e); e.reveal(2); },       at:[D[2],D[2]+7,D[2]+12], tail:[0.05,0.35]},
       plate:   {e:e=>e.ringPlate(0.6),  at:[60,67,72,79], tail:[0.05,0.60]},
-      thump:   {e:e=>e.thump(0.2, 120), at:[48],          tail:[0.06,0.20]},
+      thump:   {e:e=>e.thump(0.2, 120), at:[48],          tail:[0.05,0.15]},
       hum:     {e:e=>{ e.setSpeed(1); e.setSpeed(1); },   at:[60,67,72], tail:[0.60,1.60]},
       fanfare: {e:e=>e.fanfare(),       at:[72,76,79,84], tail:[0.98,1.30]}
     };
