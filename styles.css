@@ -270,7 +270,8 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
 /* во время побега убираем CSS-тень: она бы обрезала тарелку на границе блока */
 .dish-frame.rolling{filter:none}
 .dish-frame.hit{animation:thunk .6s cubic-bezier(.2,1.3,.4,1)}
-@keyframes thunk{0%{transform:rotateX(24deg) scale(1.012)} 40%{transform:rotateX(26deg) scale(.997)} 100%{transform:rotateX(24deg) scale(1)}}
+/* только наклон, без scale: scale сдвигал верх стойки вместе со всей рамкой */
+@keyframes thunk{0%{transform:rotateX(24deg)} 40%{transform:rotateX(27deg)} 100%{transform:rotateX(24deg)}}
 #dish{width:100%; height:100%; display:block; overflow:visible}
 .dish-tap{position:absolute; left:5%; right:5%; top:11%; height:78%; border-radius:50%; border:none;
   background:transparent; cursor:pointer; touch-action:manipulation; z-index:5}
@@ -306,11 +307,13 @@ html[data-theme=light] .dish-frame{filter:drop-shadow(0 20px 24px rgba(70,50,25,
 .dish-frame:not(.spin):hover #pawl{transform:rotate(-5deg)}
 #rotor{will-change:transform}
 #disc{transform-box:view-box; will-change:transform}
-/* подставка вздрагивает, когда тарелка возвращается на штырёк */
-.stand{transform-box:view-box; transform-origin:200px 486px}
+/* подставка вздрагивает, когда тарелка возвращается на штырёк.
+   ось тряски — ВЕРХ стойки: шляпка с болтами прикручена намертво, поэтому она
+   не двигается вовсе, а качается только низ — ножки, основание, нижняя полочка */
+.stand{transform-box:view-box; transform-origin:200px 16px}
 .stand.shake{animation:mountShake .6s cubic-bezier(.3,.8,.4,1)}
-@keyframes mountShake{0%{transform:translate(0,0)} 18%{transform:translate(0,4px)} 42%{transform:translate(-1.5px,-2px)}
-  66%{transform:translate(1px,1.5px)} 100%{transform:translate(0,0)}}
+@keyframes mountShake{0%{transform:rotate(0)} 18%{transform:rotate(.62deg)} 42%{transform:rotate(-.44deg)}
+  66%{transform:rotate(.26deg)} 100%{transform:rotate(0)}}
 
 /* искры, свечение и ударная волна */
 .spark{fill:#fff3d2; stroke:rgba(255,178,88,.4); stroke-width:1.4}
