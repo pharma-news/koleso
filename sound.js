@@ -9,8 +9,8 @@
      · храповик — остриё стрелки бьёт по золотым точкам борта;
        сила и тембр щелчка зависят от скорости тарелки, фарфор
        на каждый удар отзывается тонким звоном;
-     · шелест вращения и низкий гул штырька — живые слои, которые
-       растут вместе со скоростью и плавно гаснут при остановке;
+     · гул тарелки на штырьке — тон, который растёт вместе со скоростью,
+       с тремоло по кругу вращения; шума воздуха нет и в помине;
      · фарфор — звон тарелки при пуске и при ударе (негармонический
        ряд обертонов, как у настоящей пластины);
      · побег: соскок со штырька, свист падения, удары об пол с
@@ -104,8 +104,8 @@ function makeEngine(ac){
      быть тише шёпота. */
   const MIX={
     click: 10,     /* храповик: остриё стрелки по золотым точкам */
-    air:   1.25,   /* шелест вращения и гул штырька */
-    roll:  1.5,    /* качение тарелки по полу */
+    air:   1.6,    /* шелест вращения: надувается на разгоне и торможении */
+    roll:  1.1,    /* качение тарелки по полу */
     hit:   5.5,    /* фарфор: пуск, удары о пол, звон, посадка на штырёк */
     bell:  4,      /* колокольчики слов */
     ui:    16      /* кнопки, наведение, шелест пера */
@@ -170,41 +170,46 @@ function makeEngine(ac){
     s.connect(hp); hp.connect(bp); bp.connect(g); g.connect(E.clickBus);
     env(g,t, amp, 0.0006, 0.024+0.014*(1-Math.min(1,k)));
     s.start(t, rnd(0,1.4)); s.stop(t+0.14);
-    /* тело рычажка */
-    const o=ac.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime((430+300*k)*j, t);
+    /* золотая точка звякает, рычажок отдаётся коротким стуком */
+    const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(1150*j, t);
     const og=gn(0); o.connect(og); og.connect(E.clickBus);
-    env(og,t, amp*0.22, 0.001, 0.055); o.start(t); o.stop(t+0.12);
+    env(og,t, amp*(0.14+0.06*Math.min(1,k)), 0.0008, 0.065); o.start(t); o.stop(t+0.14);
+    const o2=ac.createOscillator(); o2.type='triangle'; o2.frequency.setValueAtTime((300+120*k)*j, t);
+    const o2g=gn(0); o2.connect(o2g); o2g.connect(E.clickBus);
+    env(o2g,t, amp*0.14, 0.001, 0.032); o2.start(t); o2.stop(t+0.09);
     /* фарфор отзывается на каждый удар тонким звоном борта */
-    partials(t, 2600*j, [1,1.9,3.2], [0.17,0.11,0.07], 0.010+0.018*Math.min(1,k), E.clickBus, 0.001);
+    partials(t, 2600*j, [1,1.9,3.2], [0.17,0.11,0.07], 0.012+0.022*Math.min(1,k), E.clickBus, 0.001);
   };
 
-  /* ---------------- непрерывные слои: вращение и качение ---------------- */
-  const airSrc=nz(); airSrc.loop=true;
-  const airHp=filt('highpass', 260), airBp=filt('bandpass', 620, 0.9);
-  const airG=gn(0);
-  airSrc.connect(airHp); airHp.connect(airBp); airBp.connect(airG); airG.connect(E.airBus);
-  /* верхний блеск по глазури — появляется только на большом ходу */
-  const airShimBp=filt('bandpass', 4200, 1.6), airShimG=gn(0);
-  airSrc.connect(airShimBp); airShimBp.connect(airShimG); airShimG.connect(E.airBus);
-  /* низкий гул штырька, на котором висит тарелка */
-  const hum=ac.createOscillator(); hum.type='sine'; hum.frequency.value=88;
-  const humG=gn(0), humLp=filt('lowpass', 340, 0.7);
-  hum.connect(humG); humG.connect(humLp); humLp.connect(E.airBus);
-  /* полоса «дышит»: иначе шелест звучит плоской пластмассой, а не воздухом */
-  const airLfo=ac.createOscillator(); airLfo.type='sine'; airLfo.frequency.value=0.7;
-  const airLfoG=gn(120); airLfo.connect(airLfoG); airLfoG.connect(airBp.frequency);
-  airSrc.start(); hum.start(); airLfo.start();
+  /* ---------------- голос вращения: тарелка гудит на штырьке ----------------
+     Никакого широкого шума воздуха: фарфоровая тарелка, которая крутится на
+     золотом штырьке, не шумит — она тихо гудит, и тон растёт вместе со
+     скоростью. Это два осциллятора (мода фарфора и голос штырька) с тремоло
+     по частоте вращения: слышно круг, по которому идёт тарелка, а не фен. */
+  const brA=ac.createOscillator(); brA.type='triangle'; brA.frequency.value=430;
+  const brB=ac.createOscillator(); brB.type='sine';     brB.frequency.value=866;
+  const brForm=filt('bandpass', 900, 3.4);
+  const brTrem=gn(1), brG=gn(0);
+  brA.connect(brForm); brB.connect(brForm); brForm.connect(brTrem); brTrem.connect(brG); brG.connect(E.airBus);
+  /* тремоло = круг тарелки: тон не стоит на месте, а подрагивает */
+  const brLfo=ac.createOscillator(); brLfo.type='sine'; brLfo.frequency.value=7;
+  const brLfoG=gn(0.3); brLfo.connect(brLfoG); brLfoG.connect(brTrem.gain);
+  /* штырёк не идеально круглый — тон чуть гуляет по высоте */
+  const vibLfo=ac.createOscillator(); vibLfo.type='sine'; vibLfo.frequency.value=5.5;
+  const vibG=gn(3); vibLfo.connect(vibG); vibG.connect(brA.frequency); vibG.connect(brB.frequency);
+  brA.start(); brB.start(); brLfo.start(); vibLfo.start();
 
-  let airK=0;
   E.setSpeed=function(vn){
-    const t=T(), k=clamp(vn,0,1.25);
-    airK=k;
-    airG.gain.setTargetAtTime(k<0.02?0 : 0.012+0.070*Math.min(1,k), t, 0.09);
-    airShimG.gain.setTargetAtTime(k<0.45?0 : 0.006+0.030*Math.max(0,k-0.45), t, 0.12);
-    airBp.frequency.setTargetAtTime(560+2400*Math.min(1,k), t, 0.12);
-    hum.frequency.setTargetAtTime(74+150*Math.min(1,k), t, 0.15);
-    humG.gain.setTargetAtTime(k<0.03?0 : 0.010+0.028*Math.min(1,k), t, 0.12);
-    airLfoG.gain.setTargetAtTime(80+420*Math.min(1,k), t, 0.2);
+    const t=T(), k=clamp(vn,0,1.25), mn=Math.min(1,k);
+    /* степени 2.2 хватает, чтобы на медленном ходу голоса почти не было */
+    brG.gain.setTargetAtTime(k<0.04?0 : Math.pow(mn,2.2)*0.026, t, 0.10);
+    brA.frequency.setTargetAtTime(360+300*mn, t, 0.14);
+    brB.frequency.setTargetAtTime(720+620*mn, t, 0.14);
+    brForm.frequency.setTargetAtTime(760+1100*mn, t, 0.14);
+    brLfo.frequency.setTargetAtTime(3.5+24*mn, t, 0.12);
+    brLfoG.gain.setTargetAtTime(0.20+0.42*mn, t, 0.15);
+    vibLfo.frequency.setTargetAtTime(4+18*mn, t, 0.15);
+    vibG.gain.setTargetAtTime(2+10*mn, t, 0.15);
   };
 
   const rollSrc=nz(); rollSrc.loop=true;
@@ -220,10 +225,11 @@ function makeEngine(ac){
 
   function rollK(k){
     const t=T(); k=clamp(k,0,1);
-    rollG.gain.setTargetAtTime(k<0.02?0 : 0.045+0.150*k, t, 0.09);
-    rollLp.frequency.setTargetAtTime(220+640*k, t, 0.12);
-    rollLfo.frequency.setTargetAtTime(6+26*k, t, 0.1);
-    rollLfoG.gain.setTargetAtTime(k<0.02?0 : 0.25+0.5*k, t, 0.1);
+    /* не ровный гул, а перестук: постель потише, зёрен пожиже и почаще */
+    rollG.gain.setTargetAtTime(k<0.02?0 : 0.022+0.070*k, t, 0.09);
+    rollLp.frequency.setTargetAtTime(300+700*k, t, 0.12);
+    rollLfo.frequency.setTargetAtTime(7+30*k, t, 0.1);
+    rollLfoG.gain.setTargetAtTime(k<0.02?0 : 0.35+0.55*k, t, 0.1);
     rollScG.gain.setTargetAtTime(k<0.2?0 : 0.004+0.014*k, t, 0.15);
   }
   E.setRoll=rollK;
@@ -233,8 +239,8 @@ function makeEngine(ac){
   E.rollGrain=function(dist, k){
     rollDist+=dist;
     if(rollDist<rollNext) return;
-    rollDist=0; rollNext=rnd(28,95);
-    thump(0.010+0.022*clamp(k,0,1), 105+rnd(-30,40));
+    rollDist=0; rollNext=rnd(24,70);
+    thump(0.016+0.042*clamp(k,0,1), 105+rnd(-30,40));
   };
   /* глухой короткий удар о пол (зёрна качения и мелкие посадки) */
   function thump(amp, f, at){
@@ -334,7 +340,6 @@ function makeEngine(ac){
     E.bell(f, 0.085, 2.1, t);
     E.bell(f*1.5, 0.046, 1.7, t+0.085);
     E.bell(f*2, 0.02, 1.2, t+0.17);
-    E.whoosh(0.3, 520, 1900, 0.5, t);
   };
   E.confirm=function(i){
     const t=T(), f=SCALE[((i%12)+12)%12]*0.5;
@@ -351,14 +356,13 @@ function makeEngine(ac){
     for(let k=0;k<steps.length;k++) E.bell(SCALE[steps[k]], 0.055, 1.8, t+k*0.13);
     const t2=t+steps.length*0.13;
     [SCALE[0],SCALE[4],SCALE[7]].forEach(f=>E.bell(f, 0.04, 2.6, t2));
-    E.whoosh(0.35, 420, 2600, 0.9, t2-0.12);
     E.ringPlate(0.4, t2);
   };
   /* сброс: тарелка быстро прокручивается назад */
   E.rewind=function(){
     const t=T();
     for(let k=0;k<12;k++) E.click(0.8-k*0.045, t+k*0.058);
-    E.whoosh(0.3, 2200, 320, 0.75, t);
+    E.whoosh(0.22, 1800, 500, 0.3, t);
     E.ringPlate(0.22, t+0.1);
   };
   E.theme=function(dark){
@@ -400,10 +404,21 @@ function makeEngine(ac){
     else  { E.bell(660, 0.03, 0.5, t); E.bell(440, 0.026, 0.6, t+0.07); }
   };
 
+  /* короткий щелчок пальцем по борту: пуск тарелки — это удар, а не дуновение */
+  E.flick=function(power, at){
+    const t=(at==null? T(): at), p=clamp(power,0.1,1);
+    const s=nz(), bp=filt('bandpass', 1700*rnd(0.9,1.1), 3), g=gn(0);
+    s.connect(bp); bp.connect(g); g.connect(E.hitBus);
+    env(g,t, 0.03+0.05*p, 0.0008, 0.016); s.start(t, rnd(0,1.4)); s.stop(t+0.06);
+    const o=ac.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(230,t); o.frequency.exponentialRampToValueAtTime(150, t+0.09);
+    const og=gn(0); o.connect(og); og.connect(E.hitBus);
+    env(og,t, 0.02+0.03*p, 0.002, 0.09); o.start(t); o.stop(t+0.2);
+  };
   E.spinStart=function(power){
     const t=T(), p=clamp(power,0.1,1);
-    E.whoosh(0.55*p, 260, 2100, 0.7, t);
-    E.ringPlate(0.65*p, t+0.02);
+    E.flick(p, t);                                 /* палец соскочил с борта */
+    E.ringPlate(0.65*p, t+0.015);
   };
   E.takeOff=function(){
     const t=T();
@@ -413,7 +428,7 @@ function makeEngine(ac){
   };
   E.jumpPush=function(){
     const t=T();
-    E.whoosh(0.7, 180, 1200, 0.3, t);
+    E.whoosh(0.3, 300, 1000, 0.16, t);
     const s=nz(), bp=filt('bandpass', 1300, 2), g=gn(0);
     s.connect(bp); bp.connect(g); g.connect(E.hitBus);
     env(g,t, 0.1, 0.004, 0.12); s.start(t, rnd(0,1.4)); s.stop(t+0.25);
@@ -421,7 +436,7 @@ function makeEngine(ac){
   };
   E.settle=function(){
     const t=T();
-    E.whoosh(0.5, 1500, 260, 0.42, t);            /* ударная волна при остановке */
+    E.whoosh(0.25, 1200, 500, 0.16, t);           /* короткий выдох остановки */
     E.ping(0.45, t);
     thump(0.2, 120, t+0.01);                      /* фарфор сел на штырёк */
     E.ringPlate(0.3, t);
@@ -527,9 +542,10 @@ const SFX={
     const tests={
       clickFast:  e=>e.click(1.0),
       clickSlow:  e=>e.click(0.15),
-      air:        e=>e.setSpeed(1.0),
-      airIdle:    e=>e.setSpeed(0.06),
-      roll:       e=>{ e.setRoll(1); for(let i=0;i<20;i++) e.rollGrain(60, 1); },
+      spinTone:   e=>e.setSpeed(1.0),
+      spinIdle:   e=>e.setSpeed(0.06),
+      rollBed:    e=>e.setRoll(1),
+      rollGrain:  e=>{ e.setRoll(1); e.rollGrain(60,1); e.rollGrain(60,1); },
       spinStart:  e=>e.spinStart(1),
       impactHard: e=>e.impact(1),
       impactSoft: e=>e.impact(0.35),
