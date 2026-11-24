@@ -4,7 +4,8 @@
    Фарфоровая тарелка: глазурованные сектора, золотой кант и
    золотые точки по борту, роспись в середине, деревянный
    мольберт-подставка и золотая стрелка-указатель у края тарелки.
-   Звука и озвучки слов нет.
+   Звук — в sound.js: храповик, шелест вращения, звон фарфора,
+   качение по полу, колокольчик выпавшего слова. Озвучки слов нет.
    ============================================================ */
 const WORDS=['Бумага','Арена','Награда','Чемодан','Маскарад','Ураган','Радуга','Мешок','Басня','Лагерь','Договор','Обычай'];
 const SECTORS=WORDS.length, TAU=360/SECTORS;
@@ -31,6 +32,9 @@ const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 
 const $=s=>document.querySelector(s);
 const clamp=(v,a,b)=>Math.max(a, Math.min(b, v));
+const noop=()=>{};
+/* звук живёт в sound.js; если скрипт не доехал — тарелка крутится молча */
+const SFX=window.SFX||new Proxy({}, {get:(t,k)=> k==='on'? (()=>true) : noop});
 function svgEl(name,attrs){ const e=document.createElementNS(SVGNS,name); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
 function stops(list){ return list.map(([o,c])=>svgEl('stop',{offset:o,'stop-color':c})); }
 
@@ -49,6 +53,8 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e
 
 let words=WORDS.slice();
 let rot=0, spinning=false, lastWin=-1, pawlAngle=0;
+/* для звука: где тарелка на экране и сколько она проехала за кадр */
+let frameRect=null, prevAX=0, prevAT=0;
 
 /* ------------------------------ цвета ------------------------------ */
 function isDark(){ return document.documentElement.getAttribute('data-theme')==='dark'; }
@@ -583,6 +589,7 @@ function allExplained(){
   $('#word-card').classList.add('hot');
   $('#found').disabled=true;
   $('#spin').disabled=true;
+  SFX.fanfare();                                 /* все слова объяснены */
 }
 function updateSpinState(){
   const left=available().length;
@@ -615,6 +622,13 @@ function spin(){
   highlight(-1);
   resetCard();
 
+  /* звук: с этого кадра скорость сама ведёт храповик и шелест,
+     а путь тарелки по экрану — её панораму, дальность и качение */
+  SFX.arm();
+  frameRect=wf.getBoundingClientRect();
+  prevAX=0; prevAT=performance.now();
+  SFX.setSpeed(0); SFX.rollStop(); SFX.space(0,1);
+
   const setDisc=(x,y)=>{
     const yy=y||0, t=`translate(${x.toFixed(2)}px, ${yy.toFixed(2)}px)`;
     if(disc) disc.style.transform=t;
@@ -623,7 +637,28 @@ function spin(){
       rollShadow.setAttribute('cx',(CX+x).toFixed(1));
       rollShadow.setAttribute('opacity',(clamp(1-Math.abs(yy-FLOOR_DROP)/42,0,1)*0.5).toFixed(2));
     }
+    hear(x, yy);                                 /* звук идёт следом за тарелкой */
   };
+
+  /* панорама и «дальность»: звук едет туда же, куда и тарелка, и глохнет,
+     когда она уезжает за край экрана. На полу он ещё и катится. */
+  function hear(x, yy){
+    const now=performance.now(), dt=Math.max(1, now-prevAT); prevAT=now;
+    if(frameRect){
+      const k=400/Math.max(1, frameRect.width);          /* единиц viewBox на CSS-пиксель */
+      const scr=frameRect.left+frameRect.width/2+x/k;    /* центр тарелки на экране */
+      const rad=frameRect.width*(DISH_R+8)/400;
+      const half=Math.max(1, window.innerWidth/2);
+      const vis=(Math.min(window.innerWidth, scr+rad)-Math.max(0, scr-rad))/(2*rad);
+      SFX.space(clamp((scr-half)/half,-1,1), clamp(vis, 0.2, 1));
+    }
+    const dx=Math.abs(x-prevAX); prevAX=x;
+    const rate=dx/dt;                                    /* единиц viewBox за миллисекунду */
+    if(yy>FLOOR_DROP-8 && rate>0.12){
+      const k=clamp(rate/2.1, 0, 1);
+      SFX.setRoll(k); SFX.rollGrain(dx, k);
+    } else SFX.rollStop();
+  }
 
   function phase(ms, onFrame, onDone){
     const t0=performance.now();
@@ -640,6 +675,7 @@ function spin(){
 
   /* обычный разгон и торможение: свечение, блики по глазури, щелчки и искры */
   function run(fromA, toA, durA, done){
+    SFX.spinStart(1);
     const t0=performance.now();
     let prevRot=fromA, prevT=t0, prevSlot=Math.round((((fromA%360)+360)%360)/TAU);
     (function f(now){
@@ -652,10 +688,12 @@ function spin(){
       if(!reducedMotion()){
         rotor.style.filter = v>0.18 ? `blur(${clamp(v*4,0,3).toFixed(2)}px)` : '';
         setGlow(v);
+        SFX.setSpeed(v/V_REF);
       }
       const slot=Math.round((((rot%360)+360)%360)/TAU);
       if(slot!==prevSlot){
         pawlAngle=Math.min(11, 4+v*14);
+        SFX.click(v/V_REF);
         if(!reducedMotion() && v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
         prevSlot=slot;
       }
@@ -668,6 +706,7 @@ function spin(){
   /* взвод перед пуском */
   function wind(done){
     if(!WIND) return done();
+    SFX.creak(WIND/1000);                  /* подставка коротко скрипнула */
     phase(WIND, (p)=>{
       const e=Math.sin(p*Math.PI/2);
       rot=from-BACK*e;
@@ -687,10 +726,12 @@ function spin(){
     if(reducedMotion()) return;
     rotor.style.filter = v>0.18 ? `blur(${clamp(v*4,0,3).toFixed(2)}px)` : '';
     setGlow(v);
+    SFX.setSpeed(v/V_REF);
     if(onAxle){                                  /* стрелка щёлкает только по своим золотым точкам */
       const slot=slotOf(rot);
       if(slot!==prevSlot){
         pawlAngle=Math.min(11, 4+v*14);
+        SFX.click(v/V_REF);
         if(v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
         prevSlot=slot;
       }
@@ -703,6 +744,7 @@ function spin(){
 
   /* разгон: скорость растёт до предельной и к моменту слёта уже не растёт */
   function windUpTo(maxSpeed, ms, done){
+    SFX.spinStart(0.8);
     v=0.16; prevT=performance.now(); prevSlot=slotOf(rot);
     phase(ms, (p, now)=>{ const dt=tick(now); chase(maxSpeed, dt); spinBy(dt); }, done);
   }
@@ -745,6 +787,8 @@ function spin(){
           sparkBurst(hits===1?4:(hits===2?6:3), CX+creep(t), hits===1?26:FLOOR_Y-6, hits>1);
           shakeMount();
         }
+        /* соскок со штырька, первый удар об пол, второй потише */
+        if(hits===1) SFX.takeOff(); else SFX.impact(hits===2? 1 : 0.5);
       }
       /* за краем экрана тарелка катится ещё немного, потом пауза — и возврат слева */
       return px >= right+140 && t > SETTLE+900;
@@ -780,6 +824,7 @@ function spin(){
   function leapToAxle(done){
     const F=FLOOR_DROP, t0=performance.now(); prevT=t0;
     let hits=0;
+    SFX.jumpPush(); SFX.rollStop();              /* тарелка оттолкнулась от пола */
     phase(780, (p, now)=>{
       const dt=tick(now), t=now-t0;
       chase(ESCAPE_V, dt);
@@ -795,6 +840,8 @@ function spin(){
         onAxle=true; prevSlot=slotOf(rot);
         pawlAngle=hits===1?13:8; setPawl(pawlAngle);
         if(!reducedMotion()){ sparkBurst(hits===1?5:2); shakeMount(); }
+        /* села на штырёк: звон скобы и глухой посадочный удар */
+        SFX.ping(hits===1? 0.85 : 0.3); SFX.impact(hits===1? 0.55 : 0.2);
       }
       return t>=780;
     }, ()=> brakeToTarget(done));
@@ -835,6 +882,8 @@ function spin(){
     setPawl(0);
     setGlow(0);
     if(!reducedMotion()) shockWave();
+    /* тишина: шелест и качение гаснут, фарфор звякает о штырёк */
+    SFX.setSpeed(0); SFX.rollStop(); SFX.space(0,1); SFX.settle();
     spinning=false;
     $('#spin').classList.remove('busy');
     $('#dish-tap').classList.remove('busy');
@@ -871,6 +920,7 @@ function showWord(i){
   $('#found').disabled=alreadyFound(w);
   card.classList.remove('hit'); void card.offsetWidth; card.classList.add('hit');
   card.scrollIntoView({behavior:reducedMotion()?'auto':'smooth', block:'nearest'});
+  SFX.reveal(i);                                 /* свой колокольчик на каждый сектор */
 }
 
 /* ------------------------------ объяснённые слова ------------------------------ */
@@ -885,6 +935,7 @@ function markFound(){
   if(!w || w==='—' || alreadyFound(w)) return;
   const t=new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   state.found.push({w:w,t:t});
+  SFX.confirm(words.indexOf(w));                 /* подтверждение: две ноты плюс чёрка пера */
   save(); updateResetChip(); markDone();
   if(!updateSpinState()) allExplained();
   $('#found').disabled=true;
@@ -946,7 +997,7 @@ function applyTheme(){
 function toggleTheme(){
   const dark=document.documentElement.getAttribute('data-theme')==='dark';
   state.theme = dark? 'light' : 'dark';
-  save(); applyTheme();
+  save(); SFX.theme(!dark); applyTheme();
 }
 
 /* ------------------------------ кнопки и клавиатура ------------------------------ */
@@ -958,9 +1009,11 @@ $('#btn-reset').addEventListener('click',()=>{
   if(!confirm('Начать заново? Список объяснённых слов очистится, и все слова снова встанут на тарелку.')) return;
   state.found=[]; state.spins=0; save();
   updateResetChip(); markDone(); highlight(-1); resetCard(); updateSpinState();
+  SFX.rewind();                                  /* тарелка быстро прокручивается назад */
 });
 $('#btn-theme').addEventListener('click',toggleTheme);
 document.addEventListener('keydown',e=>{
+  if(e.key==='m'||e.key==='M'||e.key==='ь'||e.key==='Ь'){ e.preventDefault(); SFX.arm(); SFX.toggle(); updateSoundChip(); return; }
   if((e.key===' '||e.key==='Enter') && !/INPUT|TEXTAREA|BUTTON/.test(e.target.tagName)){ e.preventDefault(); spin(); }
 });
 let resizeTimer=null;
@@ -968,6 +1021,30 @@ window.addEventListener('resize',()=>{
   clearTimeout(resizeTimer);
   resizeTimer=setTimeout(()=>{ if(!spinning) buildDish(); }, 220);
 });
+
+/* ------------------------------ тумблер звука ------------------------------ */
+/* Браузер не пустит звук без жеста пользователя, поэтому контекст
+   заводится на первом нажатии. М — выключить и включить, настройка
+   живёт в localStorage рядом с темой и списком слов. */
+function updateSoundChip(){
+  const b=$('#btn-sound');
+  if(!b) return;
+  const on=SFX.on();
+  b.textContent = on? '🔊 Звук' : '🔇 Тихо';
+  b.setAttribute('aria-pressed', on? 'true':'false');
+  b.title = on? 'Звук включён: храповик, шелест вращения, звон фарфора. М — выключить'
+              : 'Звук выключен. М — включить';
+  b.classList.toggle('off', !on);
+}
+const soundBtn=$('#btn-sound');
+if(soundBtn) soundBtn.addEventListener('click',()=>{ SFX.arm(); SFX.toggle(); updateSoundChip(); });
+['pointerdown','keydown','touchstart'].forEach(ev=>window.addEventListener(ev, ()=>SFX.arm(), {once:true, passive:true}));
+/* навёл курсор на ручку — еле слышный отклик; на фарфор — тонкий позвяк */
+function wireHover(){
+  document.querySelectorAll('.chip, .btn, #dish-tap').forEach(el=>{
+    el.addEventListener('pointerenter',()=>{ if(!spinning) SFX.hover(el.id==='dish-tap'? 'dish' : 'ui'); });
+  });
+}
 
 /* ------------------------------ старт ------------------------------ */
 /* тарелка стоит «как после последнего вращения»: стрелка по центру сектора */
@@ -977,4 +1054,6 @@ initAmbient();
 updateResetChip();
 resetCard();
 updateSpinState();
+updateSoundChip();
+wireHover();
 setPawl(0);

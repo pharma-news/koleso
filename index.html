@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>Тарелка слов — крути, найди слово и расскажи, что оно значит</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%BD%EF%B8%8F%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=29">
+<link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
 
@@ -23,6 +23,7 @@
     <span class="brand-text"><b>Тарелка слов</b><small>крути · найди слово в книгах · объясни</small></span>
   </div>
   <div class="top-actions">
+    <button class="chip" id="btn-sound" aria-pressed="true" title="Звук включён: храповик, шелест вращения, звон фарфора. М — выключить">🔊 Звук</button>
     <button class="chip" id="btn-reset" title="Начать заново: зачёркнутые слова вернутся на тарелку">↺ Сначала</button>
     <button class="chip btn-theme" id="btn-theme" title="Светлая или ночная тема">🌙 Ночная</button>
   </div>
@@ -54,6 +55,7 @@
   </section>
 </main>
 
-<script src="app.js?v=29"></script>
+<script src="sound.js?v=1"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

@@ -127,6 +127,9 @@ html[data-theme=light] .amb-lamp::after{background:linear-gradient(102deg, rgba(
   border-radius:999px; font-size:.88rem}
 button.chip{cursor:pointer; min-height:40px; touch-action:manipulation; transition:.14s}
 button.chip:hover{border-color:var(--brass); color:var(--brass)}
+/* звук выключен — кнопка выглядит приглушённой, а не поломанной */
+.chip.off{color:var(--muted); opacity:.7}
+.chip.off:hover{color:var(--ink); opacity:1}
 .top-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
 
 /* --------------------------- тарелка --------------------------- */
