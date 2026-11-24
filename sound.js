@@ -3,28 +3,46 @@
 
    Ни одного аудиофайла: весь звук синтезируется на лету через
    Web Audio, а «комната» — короткий синтетический хвост
-   (свёртка с затухающим шумом).
+   (свёртка с затухающим шумом) плюс музыкальное эхо.
+
+   Главный принцип: всё в лад. Лад — до-мажорная пентатоника
+   (до, ре, ми, соль, ля): любые два звука, взятые вместе,
+   звучат ладно, поэтому никакое сочетание ударов не фальшивит.
+   Все голоса — храповик, гул тарелки, звон фарфора, удары об пол,
+   свист падения, колокольчики — настроены в этот лад и в одну
+   тональность (до). Тарелка звучит как шкатулка, а не как шарманка.
 
    Что звучит:
-     · храповик — остриё стрелки бьёт по золотым точкам борта;
-       сила и тембр щелчка зависят от скорости тарелки, фарфор
-       на каждый удар отзывается тонким звоном;
-     · гул тарелки на штырьке — тон, который растёт вместе со скоростью,
-       с тремоло по кругу вращения; шума воздуха нет и в помине;
-     · фарфор — звон тарелки при пуске и при ударе (негармонический
-       ряд обертонов, как у настоящей пластины);
-     · побег: соскок со штырька, свист падения, удары об пол с
-       отскоками, качение по полу со зёрнами-неровностями. Звук
-       едет за тарелкой по панораме и глохнет, когда она за экраном;
-     · посадка на штырёк, финальный «клёц» и ударная волна;
-     · колокольчик выпавшего слова — свой лад на каждый сектор
-       (пентатоника: любые два слова звучат ладно), подтверждение,
-       фанфары, сброс, смена темы, кнопки, наведение курсора.
+      · храповик — золотая точка борта звякает СВОЕЙ нотой: у каждого
+        из 12 секторов своя нота, и один оборот тарелки проигрывает
+        мелодию-фразу, которая ладно закольцована. Нота — маримбовая:
+        основной тон, октава, квинта-подмешка на быстром ходу, тонкая
+        стеклянная атака борта. На разгоне ноты короткие и частые —
+        получается арпеджио; на торможении они длиннее и распеваются;
+      · гул тарелки на штырьке — не шум и не гул «сам по себе», а
+        поющий аккорд: основной тон едет за мелодией щелчков (с
+        портаменто), над ним чистая квинта и октава, внизу тёплая
+        подкладка. Тремоло = круг тарелки;
+      · фарфор — звон тарелки настроен: несовершенные обертоны
+        заменены на благозвучный ряд (тон, квинта, октава, дуodeцима),
+        как у поющей чаши, с лёгким биением двух близко настроенных
+        голосов;
+      · побег: соскок со штырька, свист падения глиссандо на квинту
+        вниз, удары об пол — литавры: каждая посадка звучит своей
+        нотой аккорда с характерным «подгибом» высоты. Качение —
+        перестук, настроенный в тот же аккорд;
+      · посадка на штырёк — мягкий «клак» по квинте и аккордовый
+        выдох, после чего гул тарелки возвращается в тонику (до);
+      · колокольчик выпавшего слова — та же нота, что тарелка спела
+        на этом секторе, плюс квинта и октава; подтверждение —
+        трёхнотная фраза; фанфары — восходящий пентатонический
+        мотив и финальный аккорд; сброс — мелодия задом наперёд.
 
    Уровни можно проверить без ушей: SFX.selfTest() прогоняет каждый
    голос через OfflineAudioContext и возвращает пик и RMS по буферу.
    SFX.level() — текущий RMS на выходе мастер-шины (для замера
-   живого вращения).
+   живого вращения). SFX.tuningTest() проверяет, что голоса попадают
+   в свои ноты (по ДПФ отрендеренного буфера).
    ============================================================ */
 (function(global){
 'use strict';
@@ -40,19 +58,56 @@ try{
 }catch(e){}
 function saveCfg(){ try{ localStorage.setItem(SET_KEY, JSON.stringify(cfg)); }catch(e){} }
 
-/* лад выпавших слов: пентатоника, 12 ступеней на 12 секторов */
-const SCALE=[523.25,587.33,659.25,783.99,880.0,1046.5,1174.66,1318.51,1567.98,1760.0,2093.0,2349.32];
+/* ------------------------------ лад ------------------------------
+   Ноты заданы числами MIDI: 60 = до первой октавы (C4).
+   Пентатоника до-мажора: 0, 2, 4, 7, 9 полутонов от тоники. */
+const hz=(midi)=>440*Math.pow(2, (midi-69)/12);
+const PENT=[0,2,4,7,9];
+/* мелодия одного оборота: по ноте на каждый из 12 секторов.
+   Фраза кончается так, что ладно переходит в своё начало. */
+const MELODY=[72, 79, 81, 76, 79, 84, 81, 79, 76, 74, 76, 79];
+const ROOT=60;                    /* тоника — до первой октавы */
+const BASS_SEQ=[55, 48, 52, 55];  /* соль-до-ми-соль: настройка перестука и посадок */
 
-/* комната: затухающий шум вместо измерения реального помещения */
+function midiOf(sector){
+  const n=MELODY.length;
+  const i=((sector%n)+n)%n;
+  return MELODY[i];
+}
+/* ближайшая нота пентатоники к произвольной частоте — чтобы любые
+   «не музыкальные» вызовы (свист, перестук) попадали в лад */
+function snapMidi(f, lo, hi){
+  const m=Math.round(69+12*Math.log2(Math.max(20,f)/440));
+  const mm=clamp(m, lo, hi);
+  let best=mm, bd=1e9;
+  for(let o=-1;o<=1;o++){
+    for(let k=0;k<PENT.length;k++){
+      const c=ROOT+o*12+PENT[k]+ (Math.floor((mm-ROOT)/12))*12;
+      const cand=clamp(c, lo, hi);
+      const d=Math.abs(cand-mm);
+      if(d<bd){ bd=d; best=cand; }
+    }
+  }
+  return best;
+}
+
+/* комната: затухающий шум плюс несколько ранних отражений,
+   стерео-каналы не одинаковые — хвост шире и мягче */
 function makeIR(ac, dur, decay){
   const n=Math.max(8, Math.floor(ac.sampleRate*dur));
   const b=ac.createBuffer(2, n, ac.sampleRate);
   const attack=Math.max(1, ac.sampleRate*0.004);
+  const taps=[[0.011,0.5],[0.019,0.4],[0.027,0.33],[0.041,0.24],[0.063,0.16]];
   for(let c=0;c<2;c++){
     const d=b.getChannelData(c);
+    const seedOff=c*0.37;
     for(let i=0;i<n;i++){
       const t=i/n;
       d[i]=(Math.random()*2-1)*Math.pow(1-t, decay)*(1-Math.exp(-i/attack));
+    }
+    for(let k=0;k<taps.length;k++){
+      const idx=Math.floor(ac.sampleRate*(taps[k][0]+seedOff*0.02));
+      if(idx<n) d[idx]+=taps[k][1]*(c? -1: 1);
     }
   }
   return b;
@@ -65,26 +120,38 @@ function makeEngine(ac){
   const E={ac:ac};
   const T=()=>ac.currentTime;
 
-  /* мастер: общий уровень + мягкий лимитер, чтобы частые щелчки
-     на полном ходу не резали звук */
+  /* мастер: общий уровень + мягкая подкраска тембра + лимитер.
+      низ чуть теплее, верхи чуть мягче — фарфор перестаёт резать */
   const master=ac.createGain(); master.gain.value=cfg.vol;
+  const lowShelf=ac.createBiquadFilter(); lowShelf.type='lowshelf'; lowShelf.frequency.value=240; lowShelf.gain.value=1.8;
+  const hiShelf=ac.createBiquadFilter(); hiShelf.type='highshelf'; hiShelf.frequency.value=7200; hiShelf.gain.value=-3.5;
   const lim=ac.createDynamicsCompressor();
-  lim.threshold.value=-10; lim.knee.value=4; lim.ratio.value=12;
-  lim.attack.value=0.002; lim.release.value=0.25;
-  master.connect(lim); lim.connect(ac.destination);
+  lim.threshold.value=-9; lim.knee.value=6; lim.ratio.value=6;
+  lim.attack.value=0.003; lim.release.value=0.32;
+  master.connect(lowShelf); lowShelf.connect(hiShelf); hiShelf.connect(lim); lim.connect(ac.destination);
   const tap=ac.createAnalyser(); tap.fftSize=1024; tap.smoothingTimeConstant=0.55;
   lim.connect(tap);
   E.master=master; E.tap=tap;
 
   /* хвост комнаты */
-  const verb=ac.createConvolver(); verb.buffer=makeIR(ac, 1.3, 2.8);
-  const verbTone=ac.createBiquadFilter(); verbTone.type='lowpass'; verbTone.frequency.value=4800;
-  const wet=ac.createGain(); wet.gain.value=0.8;
+  const verb=ac.createConvolver(); verb.buffer=makeIR(ac, 1.6, 3.2);
+  const verbTone=ac.createBiquadFilter(); verbTone.type='lowpass'; verbTone.frequency.value=4300;
+  const wet=ac.createGain(); wet.gain.value=0.85;
   verb.connect(verbTone); verbTone.connect(wet); wet.connect(master);
   const send=ac.createGain(); send.connect(verb);
 
+  /* музыкальное эхо: короткая нотированная задержка с обратной связью.
+     Оно держит мелодию в воздухе и делает звучание объёмнее. */
+  const echoIn=ac.createGain(); echoIn.gain.value=1;
+  const dly=ac.createDelay(1.0); dly.delayTime.value=0.26;
+  const fb=ac.createGain(); fb.gain.value=0.33;
+  const fbLp=ac.createBiquadFilter(); fbLp.type='lowpass'; fbLp.frequency.value=2600; fbLp.Q.value=0.6;
+  const echoOut=ac.createGain(); echoOut.gain.value=0.20;
+  echoIn.connect(dly); dly.connect(fbLp); fbLp.connect(fb); fb.connect(dly);
+  dly.connect(echoOut); echoOut.connect(master);
+
   /* шина пространства: панорама идёт за тарелкой, «дальность»
-     глохнет, когда тарелка уезжает за край экрана */
+      глохнет, когда тарелка уезжает за край экрана */
   const wheel=ac.createGain();
   const pan=(ac.createStereoPanner? ac.createStereoPanner(): null);
   const wheelOut=ac.createGain();
@@ -97,18 +164,18 @@ function makeEngine(ac){
   };
 
   /* ------------------------------ сводка ------------------------------
-     Ручки пульта. Голосы внутри шин уже сведены между собой, так что
-     общий баланс правится только здесь. Цифры проверены прогоном каждого
-     голоса через OfflineAudioContext — SFX.selfTest() считает пик и RMS
-     на мастер-шине: ни один звук не должен резать (клиппинг) и не должен
-     быть тише шёпота. */
+      Ручки пульта. Голоса внутри шин уже сведены между собой, так что
+      общий баланс правится только здесь. Цифры проверены прогоном каждого
+      голоса через OfflineAudioContext — SFX.selfTest() считает пик и RMS
+      на мастер-шине: ни один звук не должен резать (клиппинг) и не должен
+      быть тише шёпота. */
   const MIX={
-    click: 10,     /* храповик: остриё стрелки по золотым точкам */
-    air:   1.6,    /* шелест вращения: надувается на разгоне и торможении */
-    roll:  1.1,    /* качение тарелки по полу */
-    hit:   5.5,    /* фарфор: пуск, удары о пол, звон, посадка на штырёк */
-    bell:  4,      /* колокольчики слов */
-    ui:    16      /* кнопки, наведение, шелест пера */
+    click: 3.1,    /* храповик: золотая точка звенит своей нотой */
+    air:   2.0,    /* поющий гул тарелки на штырьке */
+    roll:  1.0,    /* качение тарелки по полу */
+    hit:   4.2,    /* фарфор и литавры: пуск, удары, звон, посадка */
+    bell:  4.2,    /* колокольчики слов */
+    ui:    14      /* кнопки, наведение, шелест пера */
   };
 
   /* шумовой буфер — источник для всех «не тональных» звуков */
@@ -125,100 +192,178 @@ function makeEngine(ac){
     p.exponentialRampToValueAtTime(pk, t+Math.max(0.0005,atk));
     p.exponentialRampToValueAtTime(0.0001, t+Math.max(0.0005,atk)+Math.max(0.005,dec));
   }
-  /* шина: сухая часть + посыл в комнату */
-  function wbus(amp, wetAmt, lpHz){
+  /* шина: сухая часть + посыл в комнату + посыл в музыкальное эхо */
+  function wbus(amp, wetAmt, lpHz, echoAmt){
     const g=ac.createGain(); g.gain.value=amp;
-    if(lpHz){ const lp=filt('lowpass', lpHz, 0.7); g.connect(lp); lp.connect(wheel); if(wetAmt){ const s=gn(wetAmt); lp.connect(s); s.connect(send); } }
-    else { g.connect(wheel); if(wetAmt){ const s=gn(wetAmt); g.connect(s); s.connect(send); } }
+    const top=(lpHz? filt('lowpass', lpHz, 0.7): null);
+    if(top){ g.connect(top); top.connect(wheel); } else { g.connect(wheel); }
+    if(wetAmt){ const s=gn(wetAmt); (top||g).connect(s); s.connect(send); }
+    if(echoAmt){ const s=gn(echoAmt); (top||g).connect(s); s.connect(echoIn); }
     return g;
   }
-  function bus(amp, wetAmt){
+  function bus(amp, wetAmt, echoAmt){
     const g=ac.createGain(); g.gain.value=amp; g.connect(master);
     if(wetAmt){ const s=gn(wetAmt); g.connect(s); s.connect(send); }
+    if(echoAmt){ const s=gn(echoAmt); g.connect(s); s.connect(echoIn); }
     return g;
   }
 
-  E.clickBus=wbus(MIX.click, 0.10);
-  E.airBus  =wbus(MIX.air,  0.0);
-  E.rollBus =wbus(MIX.roll, 0.12, 1400);
-  E.hitBus  =wbus(MIX.hit,  0.35);
-  E.bellBus =wbus(MIX.bell, 0.55, 9500);
-  E.uiBus   =bus(MIX.ui,    0.06);
+  E.clickBus=wbus(MIX.click, 0.20, 0, 0.16);
+  E.airBus  =wbus(MIX.air,   0.10, 0, 0.06);
+  E.rollBus =wbus(MIX.roll,  0.10, 1400, 0.05);
+  E.hitBus  =wbus(MIX.hit,   0.38, 0, 0.10);
+  E.bellBus =wbus(MIX.bell,  0.50, 9500, 0.22);
+  E.uiBus   =bus(MIX.ui,     0.06, 0.08);
 
-  /* набор обертонов: так звучит пластина — ряд несовершенных интервалов */
-  function partials(t, f0, ratios, decs, amp, dest, atkLen){
-    for(let i=0;i<ratios.length;i++){
-      const f=f0*ratios[i]*rnd(0.996,1.004);
-      if(f>ac.sampleRate*0.45) continue;
-      const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(f,t);
-      const g=gn(0); o.connect(g); g.connect(dest);
-      env(g,t, amp*(i===0?1:0.7/(1+i*0.85)), atkLen||0.002, decs[i]);
-      o.start(t); o.stop(t+decs[i]+0.08);
-    }
+  /* чистый тон с огибающей — кирпичик всей мелодии */
+  function tone(t, f, amp, atk, dec, dest, type, lpHz){
+    const o=ac.createOscillator(); o.type=type||'sine';
+    o.frequency.setValueAtTime(Math.max(20, f), t);
+    const g=gn(0); o.connect(g);
+    if(lpHz){ const lp=filt('lowpass', lpHz, 0.7); g.connect(lp); lp.connect(dest); }
+    else g.connect(dest);
+    env(g, t, amp, atk, dec);
+    o.start(t); o.stop(t+atk+dec+0.06);
+    return {o:o, g:g};
+  }
+  /* тон, у которого высота едет от f0 к f1 (свист падения, подгиб литавр) */
+  function glide(t, f0, f1, amp, atk, dec, dest, type){
+    const n=tone(t, f0, amp, atk, dec, dest, type);
+    n.o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t+atk+dec*0.8);
+    return n;
   }
 
-  /* ---------------- храповик: остриё по золотой точке ---------------- */
-  let lastClick=-1;
-  E.click=function(vn, at){
+  /* набор обертонов. Раньше ряд был несовершенным — так звучит пластина,
+      но фальшивит относительно мелодии. Теперь ряд благозвучный
+      (тон, квинта, октава, большая децима, две октавы), а у основного
+      тона два голоса чуть врозь на настройку — лёгкое биение, как у
+      настоящего колокольчика или поющей чаши. */
+  function partials(t, f0, ratios, decs, amp, dest, atkLen, beatCents){
+    for(let i=0;i<ratios.length;i++){
+      const f=f0*ratios[i]*rnd(0.9992, 1.0008);
+      if(f>ac.sampleRate*0.45) continue;
+      const a=amp*(i===0? 1: 0.75/(1+i*0.8));
+      const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(f,t);
+      const g=gn(0); o.connect(g); g.connect(dest);
+      env(g,t, a, atkLen||0.002, decs[i]);
+      o.start(t); o.stop(t+decs[i]+0.08);
+      if(i===0 && beatCents){
+        const o2=ac.createOscillator(); o2.type='sine';
+        o2.frequency.setValueAtTime(f*Math.pow(2, beatCents/1200), t);
+        const g2=gn(0); o2.connect(g2); g2.connect(dest);
+        env(g2,t, a*0.8, atkLen||0.002, decs[i]*0.9);
+        o2.start(t); o2.stop(t+decs[i]+0.08);
+      }
+    }
+  }
+  /* ряд поющей чаши: он благозвучен и длинно живёт */
+  const BOWL=[1, 1.5, 2, 2.99, 4];
+  function bowlDecs(scale){ return [1.9,1.45,1.1,0.78,0.5].map(d=>d*scale); }
+
+  /* ---------------- храповик: золотая точка звенит нотой ----------------
+      Каждому сектору принадлежит своя нота мелодии, поэтому оборот
+      тарелки — это проигрывание фразы. Тембр — маримба/филигрань:
+      основной тон, октава, на быстром ходу к ноте подмешивается
+      квинта (получается арпеджио), и тонкая стеклянная атака борта. */
+  let lastClick=-1, clickI=0, humMidi=ROOT;
+  E.click=function(vn, sector, at){
     const t=(at==null? T() : at);
     if(t-lastClick<0.011) return;                 /* на полном ходу не сваливаемся в кашу */
     lastClick=t;
-    const k=clamp(vn,0,1.3), j=rnd(0.94,1.06);    /* j — точки борта не одинаковые */
-    const amp=0.05+0.30*Math.min(1.15,k);
-    /* щёлк: шум в узкой полосе, чем быстрее — тем выше и злее */
-    const s=nz(), hp=filt('highpass', 800+700*k), bp=filt('bandpass', (2200+2300*k)*j, 5+3*k), g=gn(0);
-    s.connect(hp); hp.connect(bp); bp.connect(g); g.connect(E.clickBus);
-    env(g,t, amp, 0.0006, 0.024+0.014*(1-Math.min(1,k)));
-    s.start(t, rnd(0,1.4)); s.stop(t+0.14);
-    /* золотая точка звякает, рычажок отдаётся коротким стуком */
-    const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(1150*j, t);
-    const og=gn(0); o.connect(og); og.connect(E.clickBus);
-    env(og,t, amp*(0.14+0.06*Math.min(1,k)), 0.0008, 0.065); o.start(t); o.stop(t+0.14);
-    const o2=ac.createOscillator(); o2.type='triangle'; o2.frequency.setValueAtTime((300+120*k)*j, t);
-    const o2g=gn(0); o2.connect(o2g); o2g.connect(E.clickBus);
-    env(o2g,t, amp*0.14, 0.001, 0.032); o2.start(t); o2.stop(t+0.09);
-    /* фарфор отзывается на каждый удар тонким звоном борта */
-    partials(t, 2600*j, [1,1.9,3.2], [0.17,0.11,0.07], 0.012+0.022*Math.min(1,k), E.clickBus, 0.001);
+    const s=(sector==null? clickI++ : sector);
+    clickI=s+1;
+    const midi=midiOf(s), f=hz(midi)*rnd(0.9995,1.0005);
+    const k=clamp(vn,0,1.3), mn=Math.min(1,k);
+    const amp=0.045+0.20*Math.min(1.05,k);
+    /* на медленном ходу нота распевается длиннее, на быстром — короткая,
+       иначе на 35 щелчках в секунду выйдет каша вместо арпеджио */
+    const dec=0.30+0.60*(1-mn);
+    tone(t, f, amp, 0.004, dec, E.clickBus, 'sine');
+    tone(t, f*2, amp*0.32, 0.004, dec*0.62, E.clickBus, 'sine');
+    if(mn>0.30) tone(t, f*3, amp*0.12*mn, 0.003, dec*0.34, E.clickBus, 'sine');
+    if(mn>0.42){                                   /* квинта-подмешка: арпеджио на разгоне */
+      const d2=0.012+rnd(0,0.008);
+      tone(t+d2, f*1.5, amp*0.30*mn, 0.005, dec*0.75, E.clickBus, 'sine');
+    }
+    /* фарфор отзывается на каждый удар тонким стеклянным звоном борта */
+    partials(t, f*4.1, [1,1.62,2.4], [0.11,0.075,0.05], 0.006+0.016*mn, E.clickBus, 0.001);
+    /* атака: остриё по золотой точке, еле слышный щелчок */
+    const s2=nz(), bp=filt('bandpass', 2600+2600*mn, 6), g=gn(0);
+    s2.connect(bp); bp.connect(g); g.connect(E.clickBus);
+    env(g,t, 0.010+0.024*mn, 0.0006, 0.013);
+    s2.start(t, rnd(0,1.4)); s2.stop(t+0.08);
+    /* гул тарелки тянется за мелодией */
+    followHum(midi);
   };
 
-  /* ---------------- голос вращения: тарелка гудит на штырьке ----------------
-     Никакого широкого шума воздуха: фарфоровая тарелка, которая крутится на
-     золотом штырьке, не шумит — она тихо гудит, и тон растёт вместе со
-     скоростью. Это два осциллятора (мода фарфора и голос штырька) с тремоло
-     по частоте вращения: слышно круг, по которому идёт тарелка, а не фен. */
-  const brA=ac.createOscillator(); brA.type='triangle'; brA.frequency.value=430;
-  const brB=ac.createOscillator(); brB.type='sine';     brB.frequency.value=866;
-  const brForm=filt('bandpass', 900, 3.4);
-  const brTrem=gn(1), brG=gn(0);
-  brA.connect(brForm); brB.connect(brForm); brForm.connect(brTrem); brTrem.connect(brG); brG.connect(E.airBus);
-  /* тремоло = круг тарелки: тон не стоит на месте, а подрагивает */
+  /* ---------------- голос вращения: тарелка поёт на штырьке ----------------
+      Никакого шума воздуха. Это живой аккорд: нижний тёплый голос,
+      основной тон, который с портаменто идёт за нотой щелчка, чистая
+      квинта над ним и октава-мерцание. Тремоло = круг тарелки,
+      лёгкое вибрато = штырёк не идеально круглый. */
+  const hSub=ac.createOscillator();  hSub.type='triangle';   /* тёплая подкладка */
+  const hSubLp=filt('lowpass', 820, 0.9);
+  const hA=ac.createOscillator();  hA.type='sine';
+  const hB=ac.createOscillator();  hB.type='sine';        /* квинта */
+  const hC=ac.createOscillator();  hC.type='sine';        /* октава-мерцание */
+  const hSubG=gn(0.20), hAg=gn(0.46), hBg=gn(0.24), hCg=gn(0.10);
+  const hMix=gn(1);
+  hSub.connect(hSubLp); hSubLp.connect(hSubG);
+  hA.connect(hAg); hB.connect(hBg); hC.connect(hCg);
+  hSubG.connect(hMix); hAg.connect(hMix); hBg.connect(hMix); hCg.connect(hMix);
+  const hTrem=gn(1), hLp=filt('lowpass', 900, 0.9), hG=gn(0);
+  hMix.connect(hTrem); hTrem.connect(hLp); hLp.connect(hG); hG.connect(E.airBus);
+  /* тремоло = круг тарелки */
   const brLfo=ac.createOscillator(); brLfo.type='sine'; brLfo.frequency.value=7;
-  const brLfoG=gn(0.3); brLfo.connect(brLfoG); brLfoG.connect(brTrem.gain);
-  /* штырёк не идеально круглый — тон чуть гуляет по высоте */
-  const vibLfo=ac.createOscillator(); vibLfo.type='sine'; vibLfo.frequency.value=5.5;
-  const vibG=gn(3); vibLfo.connect(vibG); vibG.connect(brA.frequency); vibG.connect(brB.frequency);
-  brA.start(); brB.start(); brLfo.start(); vibLfo.start();
+  const brLfoG=gn(0.28); brLfo.connect(brLfoG); brLfoG.connect(hTrem.gain);
+  /* вибрато: два медленных движения, тон «дышит», а не стоит на месте */
+  const vibLfo=ac.createOscillator(); vibLfo.type='sine'; vibLfo.frequency.value=5.2;
+  const vibG=gn(2); vibLfo.connect(vibG);
+  const swLfo=ac.createOscillator(); swLfo.type='sine'; swLfo.frequency.value=0.23;
+  const swG=gn(3); swLfo.connect(swG);
+  [hA,hB,hC].forEach(o=>{ vibG.connect(o.frequency); swG.connect(o.frequency); });
+  vibG.connect(hSub.frequency); swG.connect(hSub.frequency);
+  hSub.start(); hA.start(); hB.start(); hC.start(); brLfo.start(); vibLfo.start(); swLfo.start();
+
+  function humSet(midi, tau){
+    const t=T(), f=hz(midi);
+    hSub.frequency.setTargetAtTime(Math.max(40, f*0.5), t, tau);
+    hA.frequency.setTargetAtTime(f, t, tau);
+    hB.frequency.setTargetAtTime(f*1.4983, t, tau);   /* чистая квинта */
+    hC.frequency.setTargetAtTime(f*2, t, tau);
+  }
+  function followHum(midi){
+    const hm=midi-12;                              /* на октаву ниже щелчка */
+    if(Math.abs(hm-humMidi)<=1) return;            /* уже там */
+    humMidi=hm;
+    humSet(hm, 0.14);
+  }
+  humSet(ROOT, 0.01);
 
   E.setSpeed=function(vn){
     const t=T(), k=clamp(vn,0,1.25), mn=Math.min(1,k);
     /* степени 2.2 хватает, чтобы на медленном ходу голоса почти не было */
-    brG.gain.setTargetAtTime(k<0.04?0 : Math.pow(mn,2.2)*0.026, t, 0.10);
-    brA.frequency.setTargetAtTime(360+300*mn, t, 0.14);
-    brB.frequency.setTargetAtTime(720+620*mn, t, 0.14);
-    brForm.frequency.setTargetAtTime(760+1100*mn, t, 0.14);
-    brLfo.frequency.setTargetAtTime(3.5+24*mn, t, 0.12);
-    brLfoG.gain.setTargetAtTime(0.20+0.42*mn, t, 0.15);
-    vibLfo.frequency.setTargetAtTime(4+18*mn, t, 0.15);
-    vibG.gain.setTargetAtTime(2+10*mn, t, 0.15);
+    hG.gain.setTargetAtTime(k<0.04?0 : Math.pow(mn,2.2)*0.042, t, 0.10);
+    /* чем быстрее ход, тем больше мерцающих верхних голосов */
+    hCg.gain.setTargetAtTime(0.05+0.13*mn, t, 0.14);
+    hBg.gain.setTargetAtTime(0.18+0.12*mn, t, 0.14);
+    hLp.frequency.setTargetAtTime(760+1500*mn, t, 0.14);
+    brLfo.frequency.setTargetAtTime(3.5+22*mn, t, 0.12);
+    brLfoG.gain.setTargetAtTime(0.16+0.30*mn, t, 0.15);
+    vibLfo.frequency.setTargetAtTime(4+14*mn, t, 0.15);
+    vibG.gain.setTargetAtTime(1.5+7*mn, t, 0.15);
   };
+  /* оседаем в тонику: тарелка замирает настроенной */
+  E.restHum=function(){ humMidi=ROOT; humSet(ROOT, 0.5); };
 
+  /* ---------------- качение: перестук, настроенный в аккорд ---------------- */
   const rollSrc=nz(); rollSrc.loop=true;
   const rollLp=filt('lowpass', 300, 0.8), rollAm=gn(1), rollG=gn(0);
   rollSrc.connect(rollLp); rollLp.connect(rollAm); rollAm.connect(rollG); rollG.connect(E.rollBus);
   /* зерно качения: тарелка катится по неровностям пола */
   const rollLfo=ac.createOscillator(); rollLfo.type='sawtooth'; rollLfo.frequency.value=9;
   const rollLfoG=gn(0.4); rollLfo.connect(rollLfoG); rollLfoG.connect(rollAm.gain);
-  /* чуть скрежета по полу */
+  /* чуть скрежета по полу, приглушённого и ненавязчивого */
   const rollScBp=filt('bandpass', 1500, 1.2), rollScG=gn(0);
   rollSrc.connect(rollScBp); rollScBp.connect(rollScG); rollScG.connect(E.rollBus);
   rollSrc.start(); rollLfo.start();
@@ -226,182 +371,217 @@ function makeEngine(ac){
   function rollK(k){
     const t=T(); k=clamp(k,0,1);
     /* не ровный гул, а перестук: постель потише, зёрен пожиже и почаще */
-    rollG.gain.setTargetAtTime(k<0.02?0 : 0.022+0.070*k, t, 0.09);
+    rollG.gain.setTargetAtTime(k<0.02?0 : 0.020+0.062*k, t, 0.09);
     rollLp.frequency.setTargetAtTime(300+700*k, t, 0.12);
     rollLfo.frequency.setTargetAtTime(7+30*k, t, 0.1);
     rollLfoG.gain.setTargetAtTime(k<0.02?0 : 0.35+0.55*k, t, 0.1);
-    rollScG.gain.setTargetAtTime(k<0.2?0 : 0.004+0.014*k, t, 0.15);
+    rollScG.gain.setTargetAtTime(k<0.2?0 : 0.003+0.010*k, t, 0.15);
   }
   E.setRoll=rollK;
   E.rollStop=()=>rollK(0);
   /* dist — путь тарелки в единицах viewBox; считаем его и рассыпаем удары */
-  let rollDist=0, rollNext=rnd(30,90);
+  let rollDist=0, rollNext=rnd(30,90), rollI=0;
   E.rollGrain=function(dist, k){
     rollDist+=dist;
     if(rollDist<rollNext) return;
     rollDist=0; rollNext=rnd(24,70);
-    thump(0.016+0.042*clamp(k,0,1), 105+rnd(-30,40));
+    thump(0.016+0.040*clamp(k,0,1), hz(BASS_SEQ[(rollI++)%BASS_SEQ.length]));
   };
   /* глухой короткий удар о пол (зёрна качения и мелкие посадки) */
   function thump(amp, f, at){
     const t=(at==null? T(): at);
-    const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(f,t);
-    o.frequency.exponentialRampToValueAtTime(Math.max(34,f*0.42), t+0.09);
+    const m=snapMidi(f, 43, 60), f0=hz(m);
+    const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(f0*1.08,t);
+    o.frequency.exponentialRampToValueAtTime(f0, t+0.05);          /* мягко допевает в ноту */
     const g=gn(0); o.connect(g); g.connect(E.hitBus);
-    env(g,t, amp, 0.002, 0.1); o.start(t); o.stop(t+0.22);
-    const s=nz(), lp=filt('lowpass', 900, 0.8), sg=gn(0);
+    env(g,t, amp, 0.003, 0.17); o.start(t); o.stop(t+0.36);
+    tone(t, f0*2, amp*0.28, 0.003, 0.1, E.hitBus, 'sine');
+    const s=nz(), lp=filt('lowpass', 750, 0.8), sg=gn(0);
     s.connect(lp); lp.connect(sg); sg.connect(E.hitBus);
-    env(sg,t, amp*0.45, 0.001, 0.03); s.start(t, rnd(0,1.4)); s.stop(t+0.1);
+    env(sg,t, amp*0.26, 0.001, 0.028); s.start(t, rnd(0,1.4)); s.stop(t+0.1);
   }
   E.thump=thump;
 
   /* ---------------- фарфор: звон и удары ---------------- */
-  /* звон самой пластины: ряд несовершенных обертонов, как у тарелки */
-  E.ringPlate=function(power, at){
+  /* звон самой пластины: настроенный ряд обертонов, как у поющей чаши.
+      Тон задаётся тоникой лада, поэтому звон фарфора всегда в музыку. */
+  let bowlI=0;
+  E.ringPlate=function(power, at, midi){
     const t=(at==null? T(): at), p=clamp(power,0.02,1);
-    partials(t, 392*rnd(0.97,1.03), [1,2.59,4.08,5.67,7.12],
-      [1.9,1.3,0.95,0.7,0.5].map(d=>d*(0.55+0.5*p)), 0.010+0.045*p, E.hitBus);
-    partials(t, 1176*rnd(0.98,1.02), [1,2.3,3.9], [0.5,0.3,0.2], 0.004+0.014*p, E.hitBus);
+    const m=(midi==null? (bowlI%2? ROOT+12: ROOT) : midi);
+    const f=hz(m)*rnd(0.999,1.001);
+    partials(t, f, BOWL, bowlDecs(0.55+0.5*p), 0.012+0.045*p, E.hitBus, 0.004, 5);
+    partials(t, f*3, [1,1.5,2], [0.42,0.28,0.18], 0.005+0.016*p, E.hitBus, 0.003);
   };
+  /* удар об пол — литавра: своя нота аккорда и характерный подгиб высоты */
   E.impact=function(power, at){
     const t=(at==null? T(): at); power=clamp(power,0.05,1);
-    /* корпус: низ, быстро съезжающий вниз */
+    const m=BASS_SEQ[(bowlI++)%BASS_SEQ.length], f0=hz(m);
+    /* корпус: нота чуть выше и съезжает к своей — «та-а-м» */
     const o=ac.createOscillator(); o.type='sine';
-    o.frequency.setValueAtTime(150+110*power, t);
-    o.frequency.exponentialRampToValueAtTime(46, t+0.22);
+    o.frequency.setValueAtTime(f0*1.22, t);
+    o.frequency.exponentialRampToValueAtTime(f0, t+0.24);
     const g=gn(0); o.connect(g); g.connect(E.hitBus);
-    env(g,t, 0.09+0.36*power, 0.004, 0.3); o.start(t); o.stop(t+0.55);
-    /* шлепок об пол */
-    const s=nz(), lp=filt('lowpass', 700+1100*power, 0.9), sg=gn(0);
+    env(g,t, 0.07+0.26*power, 0.005, 0.42); o.start(t); o.stop(t+0.75);
+    tone(t, f0*2, (0.05+0.16*power)*0.4, 0.005, 0.22, E.hitBus, 'sine');
+    /* шлепок об пол — приглушённый, без верхов, которые режут слух */
+    const s=nz(), lp=filt('lowpass', 620+900*power, 0.9), sg=gn(0);
     s.connect(lp); lp.connect(sg); sg.connect(E.hitBus);
-    env(sg,t, 0.05+0.22*power, 0.0012, 0.09); s.start(t, rnd(0,1.4)); s.stop(t+0.3);
-    /* и звон: по фарфору ударили всерьёз */
-    partials(t, 392*rnd(0.98,1.02), [1,2.59,4.08,5.67,7.12],
-      [1.35,0.95,0.7,0.5,0.34].map(d=>d*(0.6+0.55*power)), 0.016+0.06*power, E.hitBus);
+    env(sg,t, 0.04+0.16*power, 0.0012, 0.075); s.start(t, rnd(0,1.4)); s.stop(t+0.3);
+    /* и звон: по фарфору ударили всерьёз — он звенит в лад */
+    partials(t, hz(ROOT)*rnd(0.999,1.001), BOWL, bowlDecs(0.62+0.5*power), 0.014+0.05*power, E.hitBus, 0.004, 4);
+    tone(t, 55, 0.02*power, 0.004, 0.5, E.hitBus, 'sine');   /* гул комнаты */
   };
-  /* короткий металлический «динь»: штырёк, скоба, кронштейн */
+  /* короткий «динь»: штырёк, скоба, кронштейн — тоже в ладу */
   E.ping=function(power, at){
     const t=(at==null? T(): at), p=clamp(power,0.05,1);
-    partials(t, 1120*rnd(0.97,1.03), [1,1.62,2.35,3.11,4.3],
-      [0.42,0.3,0.22,0.16,0.12], 0.014+0.05*p, E.hitBus, 0.001);
-    const s=nz(), bp=filt('bandpass', 3600, 6), g=gn(0);
+    partials(t, hz(ROOT+24)*rnd(0.999,1.001), [1,1.5,2,2.99],
+      [0.5,0.34,0.26,0.18], 0.012+0.042*p, E.hitBus, 0.002, 3);
+    const s=nz(), bp=filt('bandpass', 3200, 6), g=gn(0);
     s.connect(bp); bp.connect(g); g.connect(E.hitBus);
-    env(g,t, 0.02+0.07*p, 0.0006, 0.02); s.start(t, rnd(0,1.4)); s.stop(t+0.08);
+    env(g,t, 0.012+0.04*p, 0.0006, 0.016); s.start(t, rnd(0,1.4)); s.stop(t+0.08);
   };
-  /* свист падения: тон едет вниз, как падающий предмет */
+  /* свист падения: не писк, а нота, которая соскальзывает на квинту вниз */
   E.fall=function(dur, from, to, at){
     const t=(at==null? T(): at); dur=clamp(dur,0.06,1.5);
-    const o=ac.createOscillator(); o.type='sine';
-    o.frequency.setValueAtTime(from,t); o.frequency.exponentialRampToValueAtTime(to, t+dur);
-    const g=gn(0); o.connect(g); g.connect(E.hitBus);
-    env(g,t, 0.035, 0.03, dur*0.85); o.start(t); o.stop(t+dur+0.15);
-    const s=nz(), bp=filt('bandpass', from*1.6, 3.5), sg=gn(0);
-    bp.frequency.setValueAtTime(from*1.6, t); bp.frequency.exponentialRampToValueAtTime(to*1.6, t+dur);
+    const m1=snapMidi(from, 60, 84), m2=Math.max(55, m1-7);
+    const f0=hz(m1), f1=hz(m2);
+    const a=Math.min(0.045, 0.018+0.010*Math.max(0, m1-60));
+    glide(t, f0, f1, a, 0.03, dur*0.85, E.hitBus, 'sine');
+    glide(t, f0*1.5, f1*1.5, a*0.42, 0.035, dur*0.8, E.hitBus, 'sine');
+    glide(t, f0*2, f1*2, a*0.16, 0.04, dur*0.6, E.hitBus, 'sine');
+    const s=nz(), bp=filt('bandpass', f0*1.6, 4), sg=gn(0);
+    bp.frequency.setValueAtTime(f0*1.6, t); bp.frequency.exponentialRampToValueAtTime(f1*1.6, t+dur);
     s.connect(bp); bp.connect(sg); sg.connect(E.hitBus);
-    env(sg,t, 0.035, 0.04, dur*0.8); s.start(t, rnd(0,1.4)); s.stop(t+dur+0.15);
+    env(sg,t, 0.022, 0.04, dur*0.75); s.start(t, rnd(0,1.4)); s.stop(t+dur+0.15);
   };
-  /* шелест-волна: пуск тарелки, ударная волна при остановке, выдох */
+  /* шелест-волна: пуск тарелки, ударная волна при остановке, выдох.
+      К шуму добавлен аккордовый подзвук — выдох звучит музыкально. */
   E.whoosh=function(power, f0, f1, dur, at){
     const t=(at==null? T(): at); power=clamp(power,0.02,1); dur=clamp(dur,0.06,2);
     const s=nz(), bp=filt('bandpass', f0, 0.9), g=gn(0);
     bp.frequency.setValueAtTime(f0,t); bp.frequency.exponentialRampToValueAtTime(Math.max(40,f1), t+dur);
     s.connect(bp); bp.connect(g); g.connect(E.hitBus);
-    env(g,t, 0.025+0.10*power, dur*0.16, dur*0.84);
+    env(g,t, 0.02+0.08*power, dur*0.16, dur*0.84);
     s.start(t, rnd(0,1.2)); s.stop(t+dur+0.12);
+    /* подзвук: та же дуга частот, но тоном — слышна нота, а не только воздух */
+    const lo=Math.min(f0,f1), hi=Math.max(f0,f1);
+    const mA=snapMidi(hi, 55, 72), mB=snapMidi(lo, 48, 60);
+    glide(t, hz(mA), hz(mB), 0.012+0.05*power, dur*0.2, dur*0.8, E.hitBus, 'triangle');
+    tone(t+dur*0.35, hz(mB+7), 0.008+0.026*power, dur*0.2, dur*0.6, E.hitBus, 'sine');
   };
-  /* скрип дерева подставки при взводе */
+  /* подставка при взводе: вместо скрежета — струящийся струнный звук,
+      который подтягивается на квинту вверх и в конце взвода звякает */
   E.creak=function(dur, at){
     const t=(at==null? T(): at); dur=clamp(dur,0.06,1);
-    const s=nz(); s.loop=true;
-    const bp=filt('bandpass', 330, 9), trem=gn(0.45), g=gn(0);
-    s.connect(bp); bp.connect(trem); trem.connect(g); g.connect(E.hitBus);
-    const lfo=ac.createOscillator(); lfo.type='square'; lfo.frequency.setValueAtTime(13,t);
-    const lg=gn(0.4); lfo.connect(lg); lg.connect(trem.gain);
-    bp.frequency.setValueAtTime(300,t); bp.frequency.linearRampToValueAtTime(440, t+dur);
-    env(g,t, 0.035, 0.02, dur);
-    s.start(t, rnd(0,1.2)); s.stop(t+dur+0.06); lfo.start(t); lfo.stop(t+dur+0.06);
-    /* пружинка стрелки звякнет на конце взвода */
-    partials(t+dur*0.6, 1520, [1,1.7,2.6], [0.12,0.08,0.05], 0.012, E.hitBus, 0.001);
+    const f0=hz(57), f1=hz(64);                 /* ля-бемоль -> ми: подъём на квинту */
+    const o=ac.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f1, t+dur);
+    const bp=filt('bandpass', 500, 3.2), lp=filt('lowpass', 1600, 0.9), trem=gn(0.6), g=gn(0);
+    o.connect(bp); bp.connect(lp); lp.connect(trem); trem.connect(g); g.connect(E.hitBus);
+    const lfo=ac.createOscillator(); lfo.type='sine'; lfo.frequency.setValueAtTime(6.5,t);
+    const lg=gn(0.35); lfo.connect(lg); lg.connect(trem.gain);
+    const vib=ac.createOscillator(); vib.type='sine'; vib.frequency.setValueAtTime(5.5,t);
+    const vg=gn(6); vib.connect(vg); vg.connect(o.frequency);
+    bp.frequency.setValueAtTime(420,t); bp.frequency.linearRampToValueAtTime(760, t+dur);
+    env(g,t, 0.028, 0.05, dur*0.9);
+    o.start(t); o.stop(t+dur+0.1); lfo.start(t); lfo.stop(t+dur+0.1); vib.start(t); vib.stop(t+dur+0.1);
+    /* мягкий шелест по дереву, еле слышный */
+    const s=nz(), sbp=filt('bandpass', 900, 2), sg=gn(0);
+    s.connect(sbp); sbp.connect(sg); sg.connect(E.hitBus);
+    env(sg,t, 0.012, 0.05, dur*0.8); s.start(t, rnd(0,1.2)); s.stop(t+dur+0.06);
+    /* пружинка стрелки звякнет на конце взвода — нота лада */
+    partials(t+dur*0.6, hz(76), [1,1.5,2.25], [0.16,0.11,0.07], 0.012, E.hitBus, 0.002);
   };
 
   /* ---------------- слова: колокольчики ---------------- */
   E.bell=function(freq, amp, dur, at){
     const t=(at==null? T(): at);
-    const soft=1/(1+(freq/2600)*0.6);
-    partials(t, freq, [1,2.0,2.99,4.21,5.45],
-      [dur, dur*0.62, dur*0.46, dur*0.34, dur*0.24], amp*soft, E.bellBus, 0.006);
+    const soft=1/(1+(freq/2600)*0.55);
+    partials(t, freq, [1,1.5,2,2.99,4],
+      [dur, dur*0.7, dur*0.52, dur*0.33, dur*0.2], amp*soft, E.bellBus, 0.006, 4);
     /* мягкая палочка в атаке */
     const s=nz(), bp=filt('bandpass', Math.min(9000, freq*4), 5), g=gn(0);
     s.connect(bp); bp.connect(g); g.connect(E.bellBus);
-    env(g,t, amp*0.22*soft, 0.001, 0.022); s.start(t, rnd(0,1.4)); s.stop(t+0.06);
+    env(g,t, amp*0.16*soft, 0.001, 0.02); s.start(t, rnd(0,1.4)); s.stop(t+0.06);
   };
+  function chime(t, midi, amp, dur){ E.bell(hz(midi), amp, dur, t); }
+
+  /* колокольчик слова = та же нота, что тарелка спела на этом секторе,
+      плюс квинта и октава — аккорд, а не одинокий звонок */
   E.reveal=function(i){
-    const t=T(), f=SCALE[((i%12)+12)%12];
-    E.bell(f, 0.085, 2.1, t);
-    E.bell(f*1.5, 0.046, 1.7, t+0.085);
-    E.bell(f*2, 0.02, 1.2, t+0.17);
+    const t=T(), m=midiOf(i);
+    chime(t, m, 0.075, 2.2);
+    chime(t+0.09, m+7, 0.040, 1.8);
+    chime(t+0.18, m+12, 0.020, 1.3);
+    chime(t+0.01, ROOT, 0.018, 2.4);            /* тоника держит лад под нотой */
   };
+  /* подтверждение: короткая фраза «вопрос-ответ» плюс чёрка пера */
   E.confirm=function(i){
-    const t=T(), f=SCALE[((i%12)+12)%12]*0.5;
-    E.bell(f, 0.05, 1.0, t);
-    E.bell(f*1.5, 0.048, 1.15, t+0.1);
-    /* чёрка по слову: короткий шелест пера */
+    const t=T(), m=midiOf(i);
+    chime(t, m-12, 0.042, 1.1);
+    chime(t+0.11, m, 0.044, 1.25);
+    chime(t+0.22, m+7, 0.034, 1.6);
+    /* чёрка по слову: короткий шелест пера, настроенный по дуге вверх */
     const s=nz(), bp=filt('bandpass', 900, 1.4), g=gn(0);
-    bp.frequency.setValueAtTime(900,t); bp.frequency.exponentialRampToValueAtTime(3200, t+0.18);
+    bp.frequency.setValueAtTime(900,t); bp.frequency.exponentialRampToValueAtTime(2940, t+0.18);
     s.connect(bp); bp.connect(g); g.connect(E.uiBus);
-    env(g,t, 0.04, 0.03, 0.15); s.start(t, rnd(0,1.4)); s.stop(t+0.3);
+    env(g,t, 0.032, 0.03, 0.14); s.start(t, rnd(0,1.4)); s.stop(t+0.3);
   };
+  /* все слова объяснены: восходящий мотив пентатоники и финальный аккорд */
   E.fanfare=function(){
-    const t=T(), steps=[0,2,4,5,7,10,11];
-    for(let k=0;k<steps.length;k++) E.bell(SCALE[steps[k]], 0.055, 1.8, t+k*0.13);
-    const t2=t+steps.length*0.13;
-    [SCALE[0],SCALE[4],SCALE[7]].forEach(f=>E.bell(f, 0.04, 2.6, t2));
-    E.ringPlate(0.4, t2);
+    const t=T();
+    const seq=[72,76,79,84,81,84,88];
+    const off=[0,0.115,0.23,0.345,0.48,0.595,0.74];
+    for(let k=0;k<seq.length;k++) chime(t+off[k], seq[k], 0.042+0.006*(k%2), 1.7);
+    const t2=t+off[seq.length-1]+0.1;
+    [72,76,79,84].forEach(m=>chime(t2, m, 0.026, 2.8));
+    E.ringPlate(0.42, t2, ROOT);
+    /* искры сверху: три ноты вниз, их подхватывает эхо */
+    [91,88,84].forEach((m,k)=>chime(t2+0.34+k*0.12, m, 0.018, 1.1));
   };
-  /* сброс: тарелка быстро прокручивается назад */
+  /* сброс: тарелка быстро прокручивается назад — мелодия задом наперёд */
   E.rewind=function(){
     const t=T();
-    for(let k=0;k<12;k++) E.click(0.8-k*0.045, t+k*0.058);
-    E.whoosh(0.22, 1800, 500, 0.3, t);
-    E.ringPlate(0.22, t+0.1);
+    for(let k=0;k<12;k++) E.click(0.8-k*0.045, 11-k, t+k*0.058);
+    E.whoosh(0.22, 1500, 420, 0.3, t);
+    E.ringPlate(0.22, t+0.1, ROOT+12);
   };
+  /* смена темы: светлая поднимается на квинту, тёмная опускается */
   E.theme=function(dark){
     const t=T();
-    if(dark){ E.bell(392, 0.045, 1.5, t); E.bell(261.63, 0.03, 1.8, t+0.05); }
-    else    { E.bell(1046.5, 0.04, 1.1, t); E.bell(1567.98, 0.026, 1.0, t+0.05); }
+    if(dark){ chime(t, 81, 0.04, 1.5); chime(t+0.09, 76, 0.03, 1.9); chime(t+0.18, 64, 0.016, 2.2); }
+    else    { chime(t, 72, 0.038, 1.2); chime(t+0.09, 79, 0.03, 1.5); chime(t+0.18, 84, 0.018, 1.9); }
   };
 
-  /* ---------------- интерфейс ---------------- */
+  /* ---------------- интерфейс: всё в ладу ---------------- */
   E.ui=function(kind){
     const t=T();
-    const s=nz(), bp=filt('bandpass', kind==='back'?900:1600, 5), g=gn(0);
+    /* деревянная атака кнопки */
+    const s=nz(), bp=filt('bandpass', kind==='back'? 900: 1600, 5), g=gn(0);
     s.connect(bp); bp.connect(g); g.connect(E.uiBus);
-    env(g,t, 0.035, 0.0008, kind==='back'?0.03:0.014);
+    env(g,t, 0.028, 0.0008, kind==='back'? 0.028: 0.013);
     s.start(t, rnd(0,1.4)); s.stop(t+0.08);
-    const o=ac.createOscillator(); o.type='sine';
-    o.frequency.setValueAtTime(kind==='back'?520:720, t);
-    if(kind==='back') o.frequency.exponentialRampToValueAtTime(340, t+0.09);
-    const og=gn(0); o.connect(og); og.connect(E.uiBus);
-    env(og,t, 0.025, 0.002, 0.05); o.start(t); o.stop(t+0.12);
+    if(kind==='back'){ glide(t, hz(72), hz(67), 0.022, 0.003, 0.16, E.uiBus, 'sine'); }
+    else             { chime(t, 84, 0.02, 0.4); }
   };
   E.hover=function(kind){
     const t=T();
     if(kind==='dish'){
-      /* навёл курсор на фарфор: еле слышный позвяк */
-      partials(t, 4300*rnd(0.95,1.05), [1,1.7,2.6], [0.05,0.035,0.02], 0.012, E.uiBus, 0.001);
+      /* навёл курсор на фарфор: еле слышный позвяк высокой нотой лада */
+      const m=[84,86,88,91][Math.floor(Math.random()*4)];
+      partials(t, hz(m)*rnd(0.995,1.005), [1,1.62,2.4], [0.07,0.05,0.03], 0.010, E.uiBus, 0.001);
       const s=nz(), bp=filt('bandpass', 5200, 7), g=gn(0);
       s.connect(bp); bp.connect(g); g.connect(E.uiBus);
-      env(g,t, 0.014, 0.0008, 0.012); s.start(t, rnd(0,1.4)); s.stop(t+0.05);
+      env(g,t, 0.010, 0.0008, 0.011); s.start(t, rnd(0,1.4)); s.stop(t+0.05);
     } else {
-      const s=nz(), bp=filt('bandpass', 2400, 6), g=gn(0);
-      s.connect(bp); bp.connect(g); g.connect(E.uiBus);
-      env(g,t, 0.012, 0.0008, 0.012); s.start(t, rnd(0,1.4)); s.stop(t+0.05);
+      tone(t, hz(79), 0.012, 0.002, 0.09, E.uiBus, 'sine');
     }
   };
   E.muteSfx=function(on){
     const t=T();
-    if(on){ E.bell(880, 0.03, 0.5, t); E.bell(1320, 0.024, 0.5, t+0.07); }
-    else  { E.bell(660, 0.03, 0.5, t); E.bell(440, 0.026, 0.6, t+0.07); }
+    if(on){ chime(t, 72, 0.028, 0.6); chime(t+0.08, 79, 0.024, 0.8); }
+    else  { chime(t, 79, 0.028, 0.6); chime(t+0.08, 72, 0.024, 0.9); }
   };
 
   /* короткий щелчок пальцем по борту: пуск тарелки — это удар, а не дуновение */
@@ -409,39 +589,45 @@ function makeEngine(ac){
     const t=(at==null? T(): at), p=clamp(power,0.1,1);
     const s=nz(), bp=filt('bandpass', 1700*rnd(0.9,1.1), 3), g=gn(0);
     s.connect(bp); bp.connect(g); g.connect(E.hitBus);
-    env(g,t, 0.03+0.05*p, 0.0008, 0.016); s.start(t, rnd(0,1.4)); s.stop(t+0.06);
-    const o=ac.createOscillator(); o.type='sine';
-    o.frequency.setValueAtTime(230,t); o.frequency.exponentialRampToValueAtTime(150, t+0.09);
-    const og=gn(0); o.connect(og); og.connect(E.hitBus);
-    env(og,t, 0.02+0.03*p, 0.002, 0.09); o.start(t); o.stop(t+0.2);
+    env(g,t, 0.026+0.044*p, 0.0008, 0.015); s.start(t, rnd(0,1.4)); s.stop(t+0.06);
+    glide(t, hz(48)*1.1, hz(48), 0.018+0.026*p, 0.002, 0.16, E.hitBus, 'sine');
+    tone(t, hz(60), 0.008+0.014*p, 0.002, 0.1, E.hitBus, 'sine');
   };
   E.spinStart=function(power){
     const t=T(), p=clamp(power,0.1,1);
     E.flick(p, t);                                 /* палец соскочил с борта */
-    E.ringPlate(0.65*p, t+0.015);
+    E.ringPlate(0.65*p, t+0.015, ROOT+12);
+    /* тарелка трогается: гул поднимается на квинту вместе с первым кругом */
+    humMidi=ROOT+7; humSet(ROOT+7, 0.12);
+    tone(t+0.05, hz(72), 0.010+0.012*p, 0.02, 0.5, E.airBus, 'sine');
   };
   E.takeOff=function(){
     const t=T();
     E.ping(0.5, t);
     E.creak(0.22, t);
-    E.fall(0.34, 760, 300, t+0.02);
+    E.fall(0.34, hz(76), hz(67), t+0.02);
+    /* слёт со штырька: тон тарелки соскакивает вверх, как соскользящая струна */
+    glide(t+0.03, hz(60), hz(72), 0.016, 0.02, 0.3, E.airBus, 'triangle');
   };
   E.jumpPush=function(){
     const t=T();
-    E.whoosh(0.3, 300, 1000, 0.16, t);
+    E.whoosh(0.3, 300, 900, 0.16, t);
     const s=nz(), bp=filt('bandpass', 1300, 2), g=gn(0);
     s.connect(bp); bp.connect(g); g.connect(E.hitBus);
-    env(g,t, 0.1, 0.004, 0.12); s.start(t, rnd(0,1.4)); s.stop(t+0.25);
-    thump(0.22, 130, t);
+    env(g,t, 0.08, 0.004, 0.11); s.start(t, rnd(0,1.4)); s.stop(t+0.25);
+    thump(0.20, hz(48), t);
   };
   E.settle=function(){
     const t=T();
-    E.whoosh(0.25, 1200, 500, 0.16, t);           /* короткий выдох остановки */
+    E.whoosh(0.25, 1100, 440, 0.16, t);             /* короткий выдох остановки */
     E.ping(0.45, t);
-    thump(0.2, 120, t+0.01);                      /* фарфор сел на штырёк */
-    E.ringPlate(0.3, t);
+    /* села на штырёк: мягкий «клак» по квинте, а не глухая тычка */
+    tone(t+0.01, hz(48), 0.10, 0.003, 0.22, E.hitBus, 'sine');
+    tone(t+0.01, hz(55), 0.055, 0.003, 0.18, E.hitBus, 'sine');
+    E.ringPlate(0.32, t, ROOT);
+    E.restHum();                                    /* и гул оседает в тонику */
   };
-  E.stopLayers=function(){ E.setSpeed(0); E.rollStop(); };
+  E.stopLayers=function(){ E.setSpeed(0); E.rollStop(); E.restHum(); };
   E.level=function(){
     const n=tap.fftSize, buf=new Float32Array(n);
     tap.getFloatTimeDomainData(buf);
@@ -503,7 +689,7 @@ const SFX={
 
   space:function(p, d){ call('setSpace', p, d); },
   setSpeed:function(v){ call('setSpeed', v); },
-  click:function(v){ call('click', v); },
+  click:function(v, sector){ call('click', v, sector); },
   setRoll:function(k){ call('setRoll', k); },
   rollStop:function(){ call('rollStop'); },
   rollGrain:function(dist, k){ call('rollGrain', dist, k); },
@@ -534,14 +720,12 @@ const SFX={
   },
 
   /* замер уровней каждого голоса: пик и RMS на мастер-шине.
-     Слухов не требует, ищет клиппинг и «тихие» звуки. */
+      Слухов не требует, ищет клиппинг и «тихие» звуки. */
   selfTest:function(){
-    const OAC=global.OfflineAudioContext||global.webkitOfflineAudioContext;
-    if(!OAC) return Promise.reject(new Error('OfflineAudioContext нет'));
-    const SR=44100, DUR=2.6;
-    const tests={
-      clickFast:  e=>e.click(1.0),
-      clickSlow:  e=>e.click(0.15),
+    const jobs=runOffline({
+      clickFast:  e=>e.click(1.0, 5),
+      clickSlow:  e=>e.click(0.15, 2),
+      clickRun:   e=>{ for(let k=0;k<12;k++) e.click(0.85, k, k*0.07); },
       spinTone:   e=>e.setSpeed(1.0),
       spinIdle:   e=>e.setSpeed(0.06),
       rollBed:    e=>e.setRoll(1),
@@ -565,24 +749,108 @@ const SFX={
       ui:         e=>e.ui('click'),
       hover:      e=>e.hover('dish'),
       mute:       e=>e.muteSfx(true)
+    }, 2.6);
+    return jobs.then(list=>list.map(r=>({name:r.name, peak:+r.peak.toFixed(3), rms:+r.rms.toFixed(4), clip:r.peak>0.99})));
+  },
+
+  /* Проверка строя: рендерим голос, берём окно сразу после атаки (там
+      ещё нет диффузного хвоста комнаты) и сравниваем энергию ровно на
+      ожидаемой ноте с энергией на ноте, отстоящей на 100 центов. Если
+      звук настроен — отношение большое; если фальшивит, оно около единицы. */
+  tuningTest:function(){
+    const want={
+      click0:  {e:e=>e.click(0.5, 0),   at:[72],          tail:[0.02,0.22]},
+      click5:  {e:e=>e.click(0.5, 5),   at:[84],          tail:[0.02,0.22]},
+      click9:  {e:e=>e.click(0.5, 9),   at:[74],          tail:[0.02,0.22]},
+      reveal7: {e:e=>e.reveal(7),       at:[79,86,91],    tail:[0.05,0.35]},
+      reveal2: {e:e=>e.reveal(2),       at:[81,88,93],    tail:[0.05,0.35]},
+      plate:   {e:e=>e.ringPlate(0.6),  at:[60,67,72,79], tail:[0.05,0.60]},
+      thump:   {e:e=>e.thump(0.2, 120), at:[48],          tail:[0.06,0.16]},
+      hum:     {e:e=>{ e.setSpeed(1); e.setSpeed(1); },   at:[60,67,72], tail:[0.60,1.60]},
+      fanfare: {e:e=>e.fanfare(),       at:[72,76,79,84], tail:[0.98,1.30]}
     };
-    const names=Object.keys(tests);
-    const out=[];
-    return names.reduce((chain, name)=>chain.then(()=>{
-      const oc=new OAC(2, Math.floor(SR*DUR), SR);
-      const e=makeEngine(oc);
-      tests[name](e);
-      return oc.startRendering().then(buf=>{
-        let peak=0, sum=0, n=0;
-        for(let c=0;c<buf.numberOfChannels;c++){
-          const d=buf.getChannelData(c);
-          for(let i=0;i<d.length;i++){ const v=d[i]; const a=Math.abs(v); if(a>peak) peak=a; sum+=v*v; n++; }
-        }
-        out.push({name:name, peak:+peak.toFixed(3), rms:+Math.sqrt(sum/n).toFixed(4), clip:peak>0.99});
+    const names=Object.keys(want);
+    return Promise.all(names.map(name=>runOffline({x: want[name].e}, 2.6).then(list=>{
+      const r=list[0], t0=want[name].tail[0], t1=want[name].tail[1];
+      const rows=want[name].at.map(m=>{
+        const f=hz(m);
+        const on=bandEnergy(r.buf, r.rate, f, t0, t1);
+        const off=bandEnergy(r.buf, r.rate, f*Math.pow(2, 100/1200), t0, t1);
+        return {midi:m, hz:+f.toFixed(1), ratio:+(on/Math.max(1e-9, off)).toFixed(2), tuned:on>off*1.6};
       });
-    }), Promise.resolve()).then(()=>out);
+      return {name:name, ok:rows.every(x=>x.tuned), notes:rows};
+    })));
+  },
+
+  /* прогон целого вращения тем же темпом, что в игре: разгон, восемь
+      кругов с щелчками, торможение, посадка, колокольчик. Проверяет то,
+      чего по отдельным голосам не видно: не клиппит ли вся тарелка сразу
+      и стоит ли её шум в ладу (scaleRatio — отношение энергии в нотах
+      пентатоники к энергии между нотами; больше единицы — звук музыкален) */
+  spinTest:function(){
+    const V_REF=0.55, T=7.6, TURNS=8, N=380, SECT=12;
+    let clicks=0;
+    return runOffline({x:e=>{
+      e.spinStart(1);
+      let prevSlot=0, prevRot=0;
+      for(let i=1;i<=N;i++){
+        const p=i/N, t=0.3+p*T;
+        const rot=360*TURNS*(1-Math.pow(1-p,2));
+        const v=(rot-prevRot)/(T*1000/N);          /* градусов на миллисекунду */
+        prevRot=rot;
+        e.setSpeed(v/V_REF);
+        const slot=Math.round((((rot%360)+360)%360)/(360/SECT));
+        if(slot!==prevSlot){ clicks++; e.click(v/V_REF, slot%SECT, t); prevSlot=slot; }
+      }
+      e.setSpeed(0); e.settle(); e.reveal(4);
+    }}, 11).then(list=>{
+      const r=list[0];
+      const IN=[261.63,293.66,329.63,392,440,523.25,587.33,659.25,783.99,880];
+      const OUT=[277.18,311.13,369.99,415.3,466.16,554.37,622.25,739.99,830.61,932.33];
+      const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+      return {peak:+r.peak.toFixed(3), rms:+r.rms.toFixed(4), clip:r.peak>0.99,
+              clicks:clicks, scaleRatio:+(avg(IN.map(f=>bandEnergy(r.buf,r.rate,f,0.3,8)))/
+                                          avg(OUT.map(f=>bandEnergy(r.buf,r.rate,f,0.3,8)))).toFixed(2)};
+    });
   }
 };
+
+/* энергия сигнала на одной частоте: алгоритм Гёрцеля по окну [t0,t1) */
+function bandEnergy(bufs, rate, f, t0, t1){
+  const i0=Math.floor(rate*t0), i1=Math.min(bufs[0].length, Math.floor(rate*t1));
+  const coeff=2*Math.cos(2*Math.PI*f/rate);
+  let s1=0, s2=0;
+  for(let i=i0;i<i1;i++){
+    const v=(bufs[0][i]+(bufs[1]? bufs[1][i]:0))*0.5;
+    const s0=v+coeff*s1-s2;
+    s2=s1; s1=s0;
+  }
+  return Math.sqrt(Math.max(0, s1*s1+s2*s2-coeff*s1*s2))/(i1-i0);
+}
+
+/* прогон набора тестов через OfflineAudioContext: возвращает уровни
+   и сам буфер (для проверки строя) */
+function runOffline(tests, dur){
+  const OAC=global.OfflineAudioContext||global.webkitOfflineAudioContext;
+  if(!OAC) return Promise.reject(new Error('OfflineAudioContext нет'));
+  const SR=44100;
+  const names=Object.keys(tests);
+  const out=[];
+  return names.reduce((chain, name)=>chain.then(()=>{
+    const oc=new OAC(2, Math.floor(SR*dur), SR);
+    const e=makeEngine(oc);
+    tests[name](e);
+    return oc.startRendering().then(buf=>{
+      let peak=0, sum=0, n=0;
+      const chans=[];
+      for(let c=0;c<buf.numberOfChannels;c++){
+        const d=buf.getChannelData(c); chans.push(d);
+        for(let i=0;i<d.length;i++){ const v=d[i]; const a=Math.abs(v); if(a>peak) peak=a; sum+=v*v; n++; }
+      }
+      out.push({name:name, peak:peak, rms:Math.sqrt(sum/n), buf:chans, rate:buf.sampleRate});
+    });
+  }), Promise.resolve()).then(()=>out);
+}
 
 /* вкладка свернута — контекст спит, а не жжёт процессор */
 if(typeof document!=='undefined'){

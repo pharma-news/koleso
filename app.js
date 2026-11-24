@@ -693,7 +693,7 @@ function spin(){
       const slot=Math.round((((rot%360)+360)%360)/TAU);
       if(slot!==prevSlot){
         pawlAngle=Math.min(11, 4+v*14);
-        SFX.click(v/V_REF);
+        SFX.click(v/V_REF, slot%SECTORS);         /* сектор звякает своей нотой */
         if(!reducedMotion() && v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
         prevSlot=slot;
       }
@@ -731,7 +731,7 @@ function spin(){
       const slot=slotOf(rot);
       if(slot!==prevSlot){
         pawlAngle=Math.min(11, 4+v*14);
-        SFX.click(v/V_REF);
+        SFX.click(v/V_REF, slot%SECTORS);         /* сектор звякает своей нотой */
         if(v>V_REF*0.45) sparkBurst(Math.min(5, 1+Math.round(v*7)));
         prevSlot=slot;
       }
