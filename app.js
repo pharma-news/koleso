@@ -485,6 +485,8 @@ function sparkBurst(n, ox, oy, both){
       age:0, life:160+Math.random()*230, r:0.7+Math.random()*1.2 });
   }
   if(!fxRAF){ fxDtLast=performance.now(); fxRAF=requestAnimationFrame(fxStep); }
+  /* те же искры, но в комнате: они летят дальше и гаснут по дуге */
+  if(window.AMB && n>0){ const p=ambPoint(X, Y); AMB.spark(p.x, p.y, Math.min(6, n), p.s); }
 }
 function fxStep(now){
   const dt=Math.min(48, (now-fxDtLast)||16); fxDtLast=now;
@@ -590,6 +592,7 @@ function allExplained(){
   $('#found').disabled=true;
   $('#spin').disabled=true;
   SFX.fanfare();                                 /* все слова объяснены */
+  if(window.AMB){ AMB.pulse(1.1); const p=ambPoint(CX, CY); AMB.wave(p.x, p.y, 1); }
 }
 function updateSpinState(){
   const left=available().length;
@@ -626,12 +629,15 @@ function spin(){
      а путь тарелки по экрану — её панораму, дальность и качение */
   SFX.arm();
   frameRect=wf.getBoundingClientRect();
+  ambRect=frameRect; ambDish(0,0);          /* фон знает, где тарелка: от неё идёт воронка */
+  if(window.AMB) AMB.frame(0);
   prevAX=0; prevAT=performance.now();
   SFX.setSpeed(0); SFX.rollStop(); SFX.space(0,1);
 
   const setDisc=(x,y)=>{
     const yy=y||0, t=`translate(${x.toFixed(2)}px, ${yy.toFixed(2)}px)`;
     if(disc) disc.style.transform=t;
+    ambDish(x, yy);                         /* тарелка едет по экрану — за ней едет и воздух */
     if(halo) halo.style.transform=t;             /* свечение катится вместе с тарелкой */
     if(rollShadow){                              /* тень на полу: появляется, когда тарелка внизу */
       rollShadow.setAttribute('cx',(CX+x).toFixed(1));
@@ -726,6 +732,7 @@ function spin(){
     if(reducedMotion()) return;
     rotor.style.filter = v>0.18 ? `blur(${clamp(v*4,0,3).toFixed(2)}px)` : '';
     setGlow(v);
+    if(window.AMB) AMB.frame(v/V_REF);      /* скорость тарелки = сила воронки в комнате */
     SFX.setSpeed(v/V_REF);
     if(onAxle){                                  /* стрелка щёлкает только по своим золотым точкам */
       const slot=slotOf(rot);
@@ -784,7 +791,9 @@ function spin(){
       if(hits<3 && t>=[LEAVE,HIT1,HIT2][hits]){
         hits++;
         if(!reducedMotion()){
-          sparkBurst(hits===1?4:(hits===2?6:3), CX+creep(t), hits===1?26:FLOOR_Y-6, hits>1);
+          const hx=CX+creep(t), hy=hits===1?26:FLOOR_Y-6;
+          sparkBurst(hits===1?4:(hits===2?6:3), hx, hy, hits>1);
+          if(window.AMB){ const p=ambPoint(hx, hy); AMB.wave(p.x, p.y, hits===2?1:0.6); }
           shakeMount();
         }
         /* соскок со штырька, первый удар об пол, второй потише */
@@ -839,7 +848,10 @@ function spin(){
         hits++;
         onAxle=true; prevSlot=slotOf(rot);
         pawlAngle=hits===1?13:8; setPawl(pawlAngle);
-        if(!reducedMotion()){ sparkBurst(hits===1?5:2); shakeMount(); }
+        if(!reducedMotion()){
+          sparkBurst(hits===1?5:2); shakeMount();
+          if(window.AMB){ const p=ambPoint(CX, 24); AMB.wave(p.x, p.y, hits===1?0.8:0.4); }
+        }
         /* села на штырёк: звон скобы и глухой посадочный удар */
         SFX.ping(hits===1? 0.85 : 0.3); SFX.impact(hits===1? 0.55 : 0.2);
       }
@@ -882,6 +894,8 @@ function spin(){
     setPawl(0);
     setGlow(0);
     if(!reducedMotion()) shockWave();
+    /* комната отзывается на посадку: световое кольцо по стенам и тёплая волна */
+    if(window.AMB){ const p=ambPoint(CX, 24); AMB.wave(p.x, p.y, 0.9); AMB.frame(0); }
     /* тишина: шелест и качение гаснут, фарфор звякает о штырёк */
     SFX.setSpeed(0); SFX.rollStop(); SFX.space(0,1); SFX.settle();
     spinning=false;
@@ -936,6 +950,7 @@ function markFound(){
   const t=new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   state.found.push({w:w,t:t});
   SFX.confirm(words.indexOf(w));                 /* подтверждение: две ноты плюс чёрка пера */
+  if(window.AMB) AMB.pulse(0.9);                 /* комнату чуть теплит, когда слово нашли */
   save(); updateResetChip(); markDone();
   if(!updateSpinState()) allExplained();
   $('#found').disabled=true;
@@ -946,51 +961,32 @@ function alreadyFound(w){
 }
 
 /* ------------------------------ живой фон ------------------------------ */
-/* пылинки в луче света: их количество зависит от ширины экрана */
+/* дымка, боке, пылинки трёх глубин, искры и параллакс живут в ambient.js.
+   Здесь только точка входа и то, чем фон отвечает на жизнь тарелки:
+   воронка воздуха от вращения, искры от храповика, световые волны от ударов. */
 function initAmbient(){
-  const box=$('#amb-motes');
-  if(!box) return;
-  box.innerHTML='';
-  if(reducedMotion()) return;
-  const n=Math.max(14, Math.min(30, Math.round(window.innerWidth/44)));
-  const frag=document.createDocumentFragment();
-  for(let k=0;k<n;k++){
-    const m=document.createElement('span');
-    m.className='mote';
-    const size=(1.8+Math.random()*2.4).toFixed(1);
-    m.style.cssText =
-      'left:'+(Math.random()*100).toFixed(2)+'%;top:'+(18+Math.random()*86).toFixed(2)+'%;'+
-      'width:'+size+'px;height:'+size+'px;'+
-      '--d:'+(17+Math.random()*25).toFixed(1)+'s;'+
-      '--o:'+(0.22+Math.random()*0.45).toFixed(2)+';'+
-      '--dx:'+(Math.random()*90-45).toFixed(0)+'px;'+
-      '--dy:'+(-120-Math.random()*260).toFixed(0)+'px;'+
-      'animation-delay:'+(-Math.random()*42).toFixed(1)+'s';
-    frag.appendChild(m);
-  }
-  box.appendChild(frag);
+  if(window.AMB) AMB.mount(document.getElementById('amb-fx'));
 }
-/* фон чуть смещается за курсором — получается глубина */
-let ambPending=false, ambX=0, ambY=0;
-function ambShift(){
-  ambPending=false;
-  const amb=$('.ambient');
-  if(!amb) return;
-  amb.style.setProperty('--ax',(ambX*-13).toFixed(1)+'px');
-  amb.style.setProperty('--ay',(ambY*-9).toFixed(1)+'px');
+let ambRect=null;                        /* рамка тарелки на время вращения */
+function ambK(){ return ambRect ? ambRect.width/400 : 1; }
+/* где сейчас тарелка: центр и радиус на экране, с учётом её пути по полу */
+function ambDish(dx, dy){
+  if(!window.AMB || !ambRect) return;
+  const k=ambK();
+  AMB.dish(ambRect.left + (CX+(dx||0))*k, ambRect.top + (CY+(dy||0))*k, DISH_R*k);
 }
-window.addEventListener('pointermove',e=>{
-  if(reducedMotion() || e.pointerType!=='mouse') return;
-  ambX=e.clientX/Math.max(1,window.innerWidth)-0.5;
-  ambY=e.clientY/Math.max(1,window.innerHeight)-0.5;
-  if(!ambPending){ ambPending=true; requestAnimationFrame(ambShift); }
-},{passive:true});
+/* точка в единицах viewBox → экран: от неё летят искры и расходятся волны */
+function ambPoint(x, y){
+  const fr=$('#dish-frame').getBoundingClientRect(), k=fr.width/400;
+  return { x: fr.left + x*k, y: fr.top + y*k, s:k };
+}
 
 /* ------------------------------ тема ------------------------------ */
 function applyTheme(){
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const dark = state.theme==='dark' || (state.theme==='auto' && (!window.matchMedia || prefersDark));
   document.documentElement.setAttribute('data-theme', dark? 'dark':'light');
+  if(window.AMB) AMB.retheme();                  /* фон меняет палитру вместе с темой */
   $('#btn-theme').textContent = dark? '🌙 Ночная' : '☀️ Светлая';
   buildDish();
 }
